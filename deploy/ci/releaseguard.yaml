@@ -1,0 +1,23 @@
+# deploy/ci/releaseguard.yaml
+.releaseguard-base:
+  image: registry.example.com/releaseguard-analyzer:latest
+  variables:
+    AI_PROVIDER: "anthropic"
+  script:
+    - /usr/local/bin/analyzer
+  allow_failure: true
+
+.releaseguard-full:
+  extends: .releaseguard-base
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+.releaseguard-lite:
+  extends: .releaseguard-base
+  variables:
+    RG_AGENT_SELECTIVE_TEST_ENABLED: "false"
+    RG_AGENT_OWNERSHIP_ENABLED: "false"
+    RG_RAG_ENABLED: "false"
+    POSTGRES_URL: ""
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'

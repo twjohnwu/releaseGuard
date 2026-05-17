@@ -1,0 +1,142 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type AgentFlags struct {
+	SelectiveTest bool
+	RolloutRisk   bool
+	Ownership     bool
+	AIReviewer    bool
+}
+
+type Config struct {
+	Agents                     AgentFlags
+	RAGEnabled                 bool
+	PostgresURL                string
+	AIProvider                 string
+	AIProviderKey              string
+	GitLabToken                string
+	GitLabAPIBase              string
+	ProjectsDir                string
+	AnalyzeTimeoutSec          int
+	OwnershipLookbackDays      int
+	SelectiveTestMinConfidence float64
+	PromptMaxTokens            int
+	ReviewerSelfReflection     bool
+	CoverageFormat             string
+	DocsRepoNames              string
+
+	// Caller-provided pipeline variables (per-MR).
+	TargetServiceName  string
+	TargetServiceTypes []string
+	CommitSHA          string
+	CIProjectID        int
+	CIMergeRequestIID  int
+}
+
+// parseServiceTypes splits a comma-separated list, trims whitespace, and
+// defaults to ["backend"] when empty (preserves prior analyzer behaviour).
+func parseServiceTypes(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return []string{"backend"}
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"backend"}
+	}
+	return out
+}
+
+func boolEnv(key string, def bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return def
+	}
+	return b
+}
+
+func intEnv(key string, def int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+func floatEnv(key string, def float64) float64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return def
+	}
+	return f
+}
+
+func strEnv(key, def string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	return v
+}
+
+func Load() (*Config, error) {
+	c := &Config{
+		Agents: AgentFlags{
+			SelectiveTest: boolEnv("RG_AGENT_SELECTIVE_TEST_ENABLED", true),
+			RolloutRisk:   boolEnv("RG_AGENT_ROLLOUT_RISK_ENABLED", true),
+			Ownership:     boolEnv("RG_AGENT_OWNERSHIP_ENABLED", true),
+			AIReviewer:    boolEnv("RG_AGENT_AI_REVIEWER_ENABLED", true),
+		},
+		RAGEnabled:                 boolEnv("RG_RAG_ENABLED", true),
+		PostgresURL:                os.Getenv("POSTGRES_URL"),
+		AIProvider:                 strEnv("AI_PROVIDER", "anthropic"),
+		AIProviderKey:              os.Getenv("AI_PROVIDER_KEY"),
+		GitLabToken:                os.Getenv("GITLAB_TOKEN"),
+		GitLabAPIBase:              strEnv("GITLAB_API_BASE", "https://gitlab.com/api/v4"),
+		ProjectsDir:                strEnv("PROJECTS_DIR", "/app/projects"),
+		AnalyzeTimeoutSec:          intEnv("ANALYZE_TIMEOUT_SEC", 180),
+		OwnershipLookbackDays:      intEnv("OWNERSHIP_LOOKBACK_DAYS", 180),
+		SelectiveTestMinConfidence: floatEnv("SELECTIVE_TEST_MIN_CONFIDENCE", 0.85),
+		PromptMaxTokens:            intEnv("PROMPT_MAX_TOKENS", 8000),
+		ReviewerSelfReflection:     boolEnv("RG_REVIEWER_SELF_REFLECTION", false),
+		CoverageFormat:             strEnv("COVERAGE_FORMAT", "lcov"),
+		DocsRepoNames:              os.Getenv("DOCS_REPO_NAMES"),
+
+		TargetServiceName:  os.Getenv("TARGET_SERVICE_NAME"),
+		TargetServiceTypes: parseServiceTypes(os.Getenv("TARGET_SERVICE_TYPE")),
+		CommitSHA:          os.Getenv("CI_COMMIT_SHA"),
+		CIProjectID:        intEnv("CI_PROJECT_ID", 0),
+		CIMergeRequestIID:  intEnv("CI_MERGE_REQUEST_IID", 0),
+	}
+
+	if c.AIProviderKey == "" {
+		return nil, fmt.Errorf("AI_PROVIDER_KEY required")
+	}
+	if c.GitLabToken == "" {
+		return nil, fmt.Errorf("GITLAB_TOKEN required")
+	}
+	return c, nil
+}

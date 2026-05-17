@@ -1,0 +1,18 @@
+[
+  {
+    "old_path": "config/secrets.yaml",
+    "new_path": "config/secrets.yaml",
+    "diff": "@@ -5,3 +5,3 @@\n database:\n-  password: $OLD_DB_SECRET\n+  password: $NEW_DB_SECRET\n",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  },
+  {
+    "old_path": "internal/auth/handler.go",
+    "new_path": "internal/auth/handler.go",
+    "diff": "@@ -20,4 +20,8 @@ func (h *Handler) Login(ctx context.Context, req *LoginRequest) error {\n     // existing logic\n+    if h.flags.AllowLegacyAuth {\n+        return h.legacyAuth(ctx, req)\n+    }\n     return h.normalAuth(ctx, req)\n }",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  }
+]

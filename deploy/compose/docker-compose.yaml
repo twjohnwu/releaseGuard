@@ -1,0 +1,88 @@
+# Local end-to-end harness for releaseguard analyzer (topology 1, Plan B scope).
+#
+# Layout:
+#   mock-gitlab       — minimal HTTP server faking the two endpoints analyzer hits
+#   analyzer-proceed  — runs against project_id=1 (docs only) -> PROCEED
+#   analyzer-review   — runs against project_id=2 (handler w/o spec) -> REVIEW
+#   analyzer-hold     — runs against project_id=3 (secrets + handler) -> HOLD
+#
+# After `docker compose up --abort-on-container-exit`:
+#   - artifacts/notes.log                   — append-only log of every note posted
+#   - artifacts/note-proj{N}-mr{M}-*.md     — the actual MR comment body per project
+#   - artifacts/selective-tests.txt         — present when Selective Test fired with
+#                                             confidence >= SELECTIVE_TEST_MIN_CONFIDENCE
+
+x-analyzer-base: &analyzer-base
+  build:
+    context: ../..
+    dockerfile: deploy/Dockerfile.analyzer
+  depends_on:
+    mock-gitlab:
+      condition: service_healthy
+  working_dir: /artifacts
+  volumes:
+    - ./artifacts:/artifacts
+
+x-analyzer-env: &analyzer-env
+  AI_PROVIDER_KEY: "fake-key-not-used"
+  GITLAB_TOKEN: "fake-token"
+  GITLAB_API_BASE: "http://mock-gitlab:8080/api/v4"
+  RG_AGENT_SELECTIVE_TEST_ENABLED: "true"
+  RG_AGENT_ROLLOUT_RISK_ENABLED: "true"
+  RG_AGENT_OWNERSHIP_ENABLED: "false"
+  RG_AGENT_AI_REVIEWER_ENABLED: "false"
+  RG_RAG_ENABLED: "false"
+  POSTGRES_URL: ""
+  TARGET_SERVICE_NAME: "demo-service"
+  TARGET_SERVICE_TYPE: "backend"
+  SELECTIVE_TEST_MIN_CONFIDENCE: "0.5"
+  ANALYZE_TIMEOUT_SEC: "60"
+
+services:
+  mock-gitlab:
+    build:
+      context: ./mock-gitlab
+    container_name: rg-mock-gitlab
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./mock-gitlab/fixtures:/fixtures:ro
+      - ./artifacts:/artifacts
+    environment:
+      MOCK_PORT: "8080"
+      MOCK_FIXTURE_DIR: /fixtures
+      MOCK_ARTIFACTS_DIR: /artifacts
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://localhost:8080/api/v4/projects/1/merge_requests/1/diffs --header 'PRIVATE-TOKEN: x' >/dev/null 2>&1 || exit 1"
+      interval: 1s
+      timeout: 1s
+      retries: 5
+
+  analyzer-proceed:
+    <<: *analyzer-base
+    container_name: rg-analyzer-proceed
+    environment:
+      <<: *analyzer-env
+      CI_PROJECT_ID: "1"
+      CI_MERGE_REQUEST_IID: "1"
+      CI_COMMIT_SHA: "demo-commit-proceed"
+
+  analyzer-review:
+    <<: *analyzer-base
+    container_name: rg-analyzer-review
+    environment:
+      <<: *analyzer-env
+      CI_PROJECT_ID: "2"
+      CI_MERGE_REQUEST_IID: "2"
+      CI_COMMIT_SHA: "demo-commit-review"
+
+  analyzer-hold:
+    <<: *analyzer-base
+    container_name: rg-analyzer-hold
+    environment:
+      <<: *analyzer-env
+      CI_PROJECT_ID: "3"
+      CI_MERGE_REQUEST_IID: "3"
+      CI_COMMIT_SHA: "demo-commit-hold"

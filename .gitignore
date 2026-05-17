@@ -1,0 +1,17 @@
+/bin/
+/analyzer
+*.test
+*.out
+selective-tests.txt
+.env
+.DS_Store
+
+# LLM
+AGENTS.local.md
+CLAUDE.local.md
+.claude/*
+.cursor/*
+.opencode/*
+.serena/*
+.specify/*
+specs/*

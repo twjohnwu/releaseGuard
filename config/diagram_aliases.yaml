@@ -1,0 +1,11 @@
+# config/diagram_aliases.yaml
+# alias -> repos.name; "(skip)" means not a service repo
+aliases:
+  FE: web-dashboard
+  Web: web-dashboard
+  BFF: api-gateway
+  BE-payments: payments-api
+  BE-orders: orders-api
+  BE-promo: promo-api
+  Postgres: (skip)
+  Redis: (skip)
