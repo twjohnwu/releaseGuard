@@ -13,7 +13,7 @@ type Zone struct {
 	LookbackDays             int
 }
 
-func computeZones(ctx context.Context, pool *storage.Pool, repoID int64, files []string) []Zone {
+func computeZones(ctx context.Context, pool *storage.Pool, repoID int64, files []string) ([]Zone, error) {
 	zones := map[string]map[string]bool{}
 	for _, f := range files {
 		zone := topLevel(f)
@@ -24,12 +24,19 @@ func computeZones(ctx context.Context, pool *storage.Pool, repoID int64, files [
 			"SELECT DISTINCT author FROM ownership_signals WHERE repo_id=$1 AND file_path LIKE $2",
 			repoID, zone+"%")
 		if err != nil {
-			continue
+			return nil, err
 		}
 		for rows.Next() {
 			var a string
-			rows.Scan(&a)
+			if err := rows.Scan(&a); err != nil {
+				rows.Close()
+				return nil, err
+			}
 			zones[zone][a] = true
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
 		}
 		rows.Close()
 	}
@@ -37,7 +44,7 @@ func computeZones(ctx context.Context, pool *storage.Pool, repoID int64, files [
 	for z, authors := range zones {
 		out = append(out, Zone{Path: z, RecentActiveAuthorsCount: len(authors), LookbackDays: 90})
 	}
-	return out
+	return out, nil
 }
 
 func topLevel(path string) string {

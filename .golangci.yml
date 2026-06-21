@@ -1,0 +1,15 @@
+# golangci-lint v2 config. Guards against the database/sql + pgx footguns that
+# slipped through code review: unchecked rows.Scan / QueryRow.Scan returns,
+# blank-assigned (`_`) Query errors, missing rows.Close(), and missing rows.Err().
+version: "2"
+
+linters:
+  # errcheck/govet/staticcheck/ineffassign/unused are on by default in v2.
+  enable:
+    - sqlclosecheck   # pgx-aware: flags rows that are never Close()d
+    - rowserrcheck    # flags loops that never check rows.Err() (best-effort for pgx.Rows)
+  settings:
+    errcheck:
+      # Catch `rows.Scan(...)` / `QueryRow(...).Scan(...)` whose error is dropped,
+      # and `rows, _ := pool.Query(...)` blank assignments.
+      check-blank: true

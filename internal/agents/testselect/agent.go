@@ -33,16 +33,24 @@ func (a *Agent) Run(ctx context.Context, in interfaces.AgentInput) (interfaces.A
 	required, skippable, conf, reason := runL1(in.Diff)
 
 	if a.hasDB && a.pool != nil {
-		// L3 attempt: collect changed symbols from diff files
+		// L3 attempt: collect changed symbols from diff files. DB-backed levels
+		// are best-effort: on any query error we skip them and keep the L1 result.
 		var changedSymbols []string
-		rows, _ := a.pool.Query(ctx,
-			"SELECT id FROM symbols WHERE repo_id=$1 AND file = ANY($2)", a.repoID, files)
-		for rows.Next() {
-			var id string
-			rows.Scan(&id)
-			changedSymbols = append(changedSymbols, id)
+		if rows, err := a.pool.Query(ctx,
+			"SELECT id FROM symbols WHERE repo_id=$1 AND file = ANY($2)", a.repoID, files); err == nil {
+			for rows.Next() {
+				var id string
+				if err := rows.Scan(&id); err != nil {
+					changedSymbols = nil
+					break
+				}
+				changedSymbols = append(changedSymbols, id)
+			}
+			if err := rows.Err(); err != nil {
+				changedSymbols = nil
+			}
+			rows.Close()
 		}
-		rows.Close()
 		if len(changedSymbols) > 0 {
 			if l3req, l3conf, err := L3QueryRequired(ctx, a.pool, a.repoID, changedSymbols); err == nil && len(l3req) > 0 && l3conf >= 0.6 {
 				required = l3req

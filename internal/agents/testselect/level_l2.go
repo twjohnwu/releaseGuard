@@ -25,5 +25,8 @@ func L2QueryRequired(ctx context.Context, pool *storage.Pool, repoID int64, file
 		}
 		out = append(out, t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }

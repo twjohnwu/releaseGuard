@@ -27,7 +27,10 @@ func TestZonesGroupsByTopLevelDir(t *testing.T) {
 		pool.Exec(ctx, `INSERT INTO ownership_signals(repo_id, file_path, author, blame_weight, recency_score)
 			VALUES($1, 'orders/handler.go', $2, 0.3, 0.9) ON CONFLICT DO NOTHING`, rid, a)
 	}
-	zs := computeZones(ctx, pool, rid, []string{"orders/handler.go", "payments/svc.go"})
+	zs, err := computeZones(ctx, pool, rid, []string{"orders/handler.go", "payments/svc.go"})
+	if err != nil {
+		t.Fatalf("computeZones: %v", err)
+	}
 	if len(zs) != 2 {
 		t.Fatalf("expected 2 zones, got %d", len(zs))
 	}

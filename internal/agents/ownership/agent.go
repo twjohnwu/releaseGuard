@@ -38,7 +38,10 @@ func (a *Agent) Run(ctx context.Context, in interfaces.AgentInput) (interfaces.A
 		files = append(files, f.Path)
 	}
 
-	candidates := buildCandidates(ctx, a.pool, a.repoID, files)
+	candidates, err := buildCandidates(ctx, a.pool, a.repoID, files)
+	if err != nil {
+		return a.failed(start, "ownership query failed: "+err.Error()), nil
+	}
 	top := selectAndShuffle(candidates, 3, time.Now().UnixNano())
 
 	suggested := []SuggestedReviewer{}
@@ -47,7 +50,10 @@ func (a *Agent) Run(ctx context.Context, in interfaces.AgentInput) (interfaces.A
 			Name: c.Author, Context: phraseContext(c),
 		})
 	}
-	zones := computeZones(ctx, a.pool, a.repoID, files)
+	zones, err := computeZones(ctx, a.pool, a.repoID, files)
+	if err != nil {
+		return a.failed(start, "ownership zones query failed: "+err.Error()), nil
+	}
 	hints := []Hint{} // matrix wiring deferred; PoC keeps empty
 
 	return interfaces.AgentOutput{
@@ -63,19 +69,32 @@ func (a *Agent) Run(ctx context.Context, in interfaces.AgentInput) (interfaces.A
 	}, nil
 }
 
-func buildCandidates(ctx context.Context, pool *storage.Pool, repoID int64, files []string) []candidate {
+// failed builds a degraded output for when a DB read errors out, mirroring the
+// "no Postgres" early return so a partial/incorrect result is never emitted.
+func (a *Agent) failed(start time.Time, summary string) interfaces.AgentOutput {
+	return interfaces.AgentOutput{
+		Agent: interfaces.AgentOwnership, Status: interfaces.StatusFailed,
+		DurationMs:    int(time.Since(start) / time.Millisecond),
+		SchemaVersion: "1", Summary: summary,
+	}
+}
+
+func buildCandidates(ctx context.Context, pool *storage.Pool, repoID int64, files []string) ([]candidate, error) {
 	var out []candidate
 	for _, f := range files {
 		rows, err := pool.Query(ctx,
 			"SELECT author, blame_weight, recency_score FROM ownership_signals WHERE repo_id=$1 AND file_path=$2",
 			repoID, f)
 		if err != nil {
-			continue
+			return nil, err
 		}
 		for rows.Next() {
 			var author string
 			var weight, recency float64
-			rows.Scan(&author, &weight, &recency)
+			if err := rows.Scan(&author, &weight, &recency); err != nil {
+				rows.Close()
+				return nil, err
+			}
 			out = append(out, candidate{
 				Author: author,
 				Score:  weight * recency,
@@ -83,7 +102,11 @@ func buildCandidates(ctx context.Context, pool *storage.Pool, repoID int64, file
 				Reason: f,
 			})
 		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
 		rows.Close()
 	}
-	return out
+	return out, nil
 }

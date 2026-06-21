@@ -26,15 +26,22 @@ func L3QueryRequired(ctx context.Context, pool *storage.Pool, repoID int64, chan
 	var tests []string
 	for rows.Next() {
 		var t string
-		rows.Scan(&t)
+		if err := rows.Scan(&t); err != nil {
+			return nil, 0, err
+		}
 		tests = append(tests, t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
 	var dynRatio float64
-	pool.QueryRow(ctx, `
+	if err := pool.QueryRow(ctx, `
 		SELECT COALESCE(
 			(SELECT count(*) FROM edges WHERE callee = ANY($1) AND kind='dynamic')::float
 			/ NULLIF((SELECT count(*) FROM edges WHERE callee = ANY($1)), 0), 0)`,
-		changedSymbols).Scan(&dynRatio)
+		changedSymbols).Scan(&dynRatio); err != nil {
+		return nil, 0, err
+	}
 	conf := 0.9
 	if dynRatio > 0.3 {
 		conf -= 0.3
