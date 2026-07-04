@@ -36,7 +36,7 @@
 
 **初版**做法是寫三個獨立 agent，由 caller 決定要哪個——複雜、容易選錯、且難以表達「我有 L3 但部分檔案 fallback 到 L2」這種混合狀態。
 
-**現在**改用單一 agent 內部 chain：L3 first → L2 fallback → L1 fallback；每階各自附帶 confidence（0.9 / 0.75 / 0.6），仲裁層在做決策時直接消費 confidence，而不是去看「這次跑的是哪一階」。L3 的 dynamic-ratio 信心懲罰處理了「symbol 太發散」這種情境。
+**現在**改用單一 agent 內部 chain：L3 first → L2 fallback → L1 fallback；每階各自附帶 confidence（0.9 / 0.75 / 0.5），仲裁層在做決策時直接消費 confidence，而不是去看「這次跑的是哪一階」。L3 的 dynamic-ratio 信心懲罰處理了「symbol 太發散」這種情境。
 
 **學到的**：不要讓 caller 決定品質階層；讓系統自動降級並把品質量化成 confidence。這樣 caller 永遠拿到「目前可達的最佳結果」，仲裁層也不用為「哪一階」這件事寫額外的 if-else。
 

@@ -16,7 +16,7 @@
 
 | Level | 依賴 | confidence 範圍 | 拓樸 1 可用？ | 邏輯 |
 |---|---|---|---|---|
-| **L1** | 純 git diff，無 DB | 0.3 ~ 0.6 | ✅ | 改了 `foo/bar.go` → 找 `foo/bar_test.go` 與同 package 內 test |
+| **L1** | 純 git diff，無 DB | 0.2 ~ 0.5 | ✅ | 改了 `foo/bar.go` → 找 `foo/bar_test.go` 與同 package 內 test |
 | **L2** | `coverage_map`（Postgres） | 0.6 ~ 0.85 | ❌ 需 Postgres | 改了 file f → 在 `coverage_map` 找哪些 test 覆蓋過 f |
 | **L3** | `coverage_map` + `edges`（call graph） | 0.85 ~ 0.95 | ❌ 需 Postgres + nightly call graph | 反向 BFS on `edges` → 與 `coverage_map` 取交集 |
 

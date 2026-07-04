@@ -154,6 +154,10 @@ if total_tokens > PROMPT_MAX_TOKENS:
     - _shared/<type>/ 下優先級低的檔
 ```
 
+> **STATUS: SPEC ONLY — NOT IMPLEMENTED**
+>
+> 以下 RAG 相關段落（RAG Fallback、Hot Path、Channel B vector + BM25 查詢）僅為設計規格。目前程式碼只實作 Channel A（prompt stacking，見 `internal/agents/reviewer/`），Channel B / Hot path / RRF 融合尚未落地。
+
 ### RAG Fallback
 
 兩種觸發路徑進入相同 code path（only Channel A），log 訊息不同：
@@ -180,6 +184,10 @@ if total_tokens > PROMPT_MAX_TOKENS:
 ---
 
 ## Self-Reflection（預設 false，比對 JSON）
+
+> **STATUS: SPEC ONLY — NOT IMPLEMENTED**
+>
+> 目前只存在 `RG_REVIEWER_SELF_REFLECTION` 這個 config flag（見 `internal/config/env.go`），沒有任何 self-reflection 邏輯。以下兩段式比對流程尚未實作。
 
 ```
 1st pass: 產生 findings JSON

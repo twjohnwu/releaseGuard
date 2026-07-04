@@ -5,6 +5,10 @@
     AI_PROVIDER: "anthropic"
   script:
     - /usr/local/bin/analyzer
+  artifacts:
+    when: always
+    paths:
+      - releaseguard-report.json
   allow_failure: true
 
 .releaseguard-full:

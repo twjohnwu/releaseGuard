@@ -42,7 +42,7 @@ func L3QueryRequired(ctx context.Context, pool *storage.Pool, repoID int64, chan
 		changedSymbols).Scan(&dynRatio); err != nil {
 		return nil, 0, err
 	}
-	conf := 0.9
+	conf := L3BaseConfidence
 	if dynRatio > 0.3 {
 		conf -= 0.3
 	}

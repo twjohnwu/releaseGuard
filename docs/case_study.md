@@ -177,7 +177,7 @@ reviewer 不必翻 agent JSON 才能理解「為何 HOLD」——markdown 直接
 
 demo 對自己的弱點誠實：
 
-- **`confidence: 0.40` 在三段都一樣**——Plan B 只實作 Selective Test L1，那是純檔案路徑啟發式。L1 設計上的信心上限約 0.6，混合語言再被懲罰之後就更低。L2/L3（Postgres-backed call graph + coverage map）見 [`docs/spec/superpower/plan_c_postgres_agents.md`](spec/superpower/plan_c_postgres_agents.md)。
+- **`confidence: 0.40` 在三段都一樣**——Plan B 只實作 Selective Test L1，那是純檔案路徑啟發式。L1 設計上的信心上限約 0.5，混合語言再被懲罰之後就更低。L2/L3（Postgres-backed call graph + coverage map）見 [`docs/spec/superpower/plan_c_postgres_agents.md`](spec/superpower/plan_c_postgres_agents.md)。
 - **AI Reviewer 在這份 demo 是關閉的**（`RG_AGENT_AI_REVIEWER_ENABLED=false`），不會打真的 Anthropic API。如果接上真 key + 填好 `PROJECTS_DIR`，reviewer 就會把它的結構化 finding 餵進同一個仲裁層。
 - **Ownership Agent 不在 demo 裡**——Plan B 為「政治中性」考量刻意排除，紀錄在 `decisions_log.md` 第 4 條。Renderer 雖然有 `SuggestedReviewers` / `ImpactZones` 的 stub，但在 topology 1 維持空白。
 
@@ -213,7 +213,7 @@ done
 
 ![Topology 0 L3 MR comment](screenshots/topology0-l3.png)
 
-前面三段 outcome 都跑在 Topology 1（zero-infra），Selective Test 只有 L1 可用，confidence 上限 0.6。本節補上**Topology 0 整合驗證**——起 Postgres、跑 indexer 對 ReleaseGuard 自己做索引、再讓 analyzer 在 T0 模式跑出帶 L3 confidence 的 MR comment。
+前面三段 outcome 都跑在 Topology 1（zero-infra），Selective Test 只有 L1 可用，confidence 上限 0.5。本節補上**Topology 0 整合驗證**——起 Postgres、跑 indexer 對 ReleaseGuard 自己做索引、再讓 analyzer 在 T0 模式跑出帶 L3 confidence 的 MR comment。
 
 ### 準備
 

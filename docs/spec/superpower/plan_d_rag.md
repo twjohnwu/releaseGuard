@@ -1,5 +1,9 @@
 # ReleaseGuard Plan D — RAG + Backfill Implementation Plan
 
+> **STATUS: SPEC ONLY — NOT IMPLEMENTED**
+>
+> 整份 Plan D（RAG pipeline、embedding backfill、vector 檢索）皆為設計規格，尚未落地。
+
 > **🟡 STATUS: Deferred Roadmap (not in current PoC scope)**
 >
 > 此 plan 屬於「未來擴展」階段，**目前 PoC 主軸只做 Plan A + Plan B**（拓樸 1 部署 + 核心 Decision Arbitration Layer）。

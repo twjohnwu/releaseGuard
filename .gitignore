@@ -15,3 +15,6 @@ CLAUDE.local.md
 .serena/*
 .specify/*
 specs/*
+
+# analyzer report artifact (generated per-run, uploaded via CI artifacts)
+releaseguard-report.json

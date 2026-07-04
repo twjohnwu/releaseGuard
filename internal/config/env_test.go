@@ -45,6 +45,25 @@ func TestLoadConfigDefaults(t *testing.T) {
 		if c.AnalyzeTimeoutSec != 180 {
 			t.Fatalf("timeout default wrong: %d", c.AnalyzeTimeoutSec)
 		}
+		if c.AIModel != "claude-sonnet-4-6" {
+			t.Fatalf("AIModel default wrong: %q", c.AIModel)
+		}
+	})
+}
+
+func TestLoadConfigAIModelOverride(t *testing.T) {
+	withEnv(map[string]string{
+		"AI_PROVIDER_KEY": "key",
+		"GITLAB_TOKEN":    "tok",
+		"RG_AI_MODEL":     "claude-opus-4-8",
+	}, func() {
+		c, err := Load()
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		if c.AIModel != "claude-opus-4-8" {
+			t.Fatalf("AIModel override wrong: %q", c.AIModel)
+		}
 	})
 }
 

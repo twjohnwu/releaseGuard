@@ -52,7 +52,7 @@ func (a *Agent) Run(ctx context.Context, in interfaces.AgentInput) (interfaces.A
 			rows.Close()
 		}
 		if len(changedSymbols) > 0 {
-			if l3req, l3conf, err := L3QueryRequired(ctx, a.pool, a.repoID, changedSymbols); err == nil && len(l3req) > 0 && l3conf >= 0.6 {
+			if l3req, l3conf, err := L3QueryRequired(ctx, a.pool, a.repoID, changedSymbols); err == nil && len(l3req) > 0 && l3conf >= L3AcceptThreshold {
 				required = l3req
 				level = "L3"
 				conf = l3conf
@@ -65,14 +65,14 @@ func (a *Agent) Run(ctx context.Context, in interfaces.AgentInput) (interfaces.A
 			if l2req, err := L2QueryRequired(ctx, a.pool, a.repoID, files); err == nil && len(l2req) > 0 {
 				required = l2req
 				level = "L2"
-				conf = 0.75
+				conf = L2Confidence
 				reason = "L2: coverage_map intersection"
 			}
 		}
 	}
 
 	status := interfaces.StatusOK
-	if conf < 0.5 {
+	if conf < PartialStatusThreshold {
 		status = interfaces.StatusPartial
 	}
 	return interfaces.AgentOutput{

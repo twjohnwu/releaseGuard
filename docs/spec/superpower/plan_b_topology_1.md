@@ -444,8 +444,8 @@ func TestL1ConfidenceCapped(t *testing.T) {
 		},
 	})
 	conf := out.Metadata["confidence"].(float64)
-	if conf > 0.6 {
-		t.Fatalf("L1 confidence must be <= 0.6 (mixed lang penalty), got %f", conf)
+	if conf > 0.5 {
+		t.Fatalf("L1 confidence must be <= 0.5 (mixed lang penalty), got %f", conf)
 	}
 }
 ```
@@ -2749,7 +2749,7 @@ func run() error {
 		time.Duration(cfg.AnalyzeTimeoutSec)*time.Second)
 	defer cancel()
 
-	prov := ai.NewAnthropic(cfg.AIProviderKey, "claude-3-5-sonnet-20241022")
+	prov := ai.NewAnthropic(cfg.AIProviderKey, cfg.AIModel) // RG_AI_MODEL, default claude-sonnet-4-6
 	gl := gitlab.NewClient(cfg.GitLabAPIBase, cfg.GitLabToken)
 
 	projectID := envInt("CI_PROJECT_ID")
@@ -3044,7 +3044,7 @@ git commit --allow-empty -m "test(analyzer): plan B end-to-end topology 1 demoab
 ## What Plan B delivers
 
 After all tasks complete (in topology 1, no Postgres needed):
-- Selective Test L1 outputs same-package test list with confidence ≤ 0.6
+- Selective Test L1 outputs same-package test list with confidence ≤ 0.5
 - Rollout Risk runs 4 sub-analyses, computes HIGH/MED/LOW
 - Spec/Code drift detector flags handler-without-spec changes
 - AI Reviewer reads `PROJECTS_DIR/*.md`, calls Anthropic with tool use, returns structured findings

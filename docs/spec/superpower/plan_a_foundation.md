@@ -1578,7 +1578,7 @@ func TestAnthropicCallWithToolReturnsToolInput(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewAnthropic("test-key", "claude-3-5-sonnet-20241022")
+	p := NewAnthropic("test-key", "claude-sonnet-4-6")
 	p.endpoint = srv.URL + "/v1/messages"
 
 	got, err := p.CallWithTool(context.Background(), "sys",

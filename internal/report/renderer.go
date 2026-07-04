@@ -127,8 +127,17 @@ func Render(r ImpactScopeReport) string {
 		}
 		sb.WriteString("\n</details>\n")
 	}
+	if rec == "HOLD" || rec == "REVIEW" {
+		sb.WriteString("\n---\n")
+		sb.WriteString(fmt.Sprintf("_Think this %s is wrong? Add the label `%s` to this MR to flag a false positive — it feeds gate-precision calibration._\n", rec, FalsePositiveLabel))
+	}
 	return sb.String()
 }
+
+// FalsePositiveLabel is the GitLab MR label reviewers add when they believe a
+// HOLD/REVIEW gate misfired. The `analyzer feedback` command counts these
+// against emitted decisions to produce a precision report.
+const FalsePositiveLabel = "releaseguard:false-positive"
 
 func severityEmoji(sev string) string {
 	switch sev {

@@ -15,6 +15,14 @@ type Flags struct {
 }
 
 func Compose(outputs []interfaces.AgentOutput, flags Flags) string {
+	md, _ := ComposeWithDecision(outputs, flags)
+	return md
+}
+
+// ComposeWithDecision renders the MR comment markdown and also returns the
+// arbitration decision, so callers (e.g. the JSON report writer) can serialize
+// the decision + triggered_signals without re-running arbitration.
+func ComposeWithDecision(outputs []interfaces.AgentOutput, flags Flags) (string, report.Recommendation) {
 	enabled := filterByFlags(outputs, flags)
 	rec := report.Arbitrate(enabled)
 	r := report.ImpactScopeReport{
@@ -42,7 +50,7 @@ func Compose(outputs []interfaces.AgentOutput, flags Flags) string {
 		}
 	}
 	r.HighSeverityFindings = report.FlattenFindings(enabled)
-	return report.Render(r)
+	return report.Render(r), rec
 }
 
 func filterByFlags(outs []interfaces.AgentOutput, f Flags) []interfaces.AgentOutput {

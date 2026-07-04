@@ -241,6 +241,18 @@
 
 ---
 
+## 18. HOLD 誤報回饋：GitLab label MVP 而非 Postgres 表
+
+**最初想法**：既然要量測 gate 是否誤報，自然想到開一張 Postgres 表（`gate_feedback`）記錄每個 MR 的 decision、reviewer 是否標記誤報、時間戳，再從表裡算 precision，甚至接上 dashboard。畢竟 T0 拓樸本來就有 Postgres。
+
+**為什麼錯**：對「先驗證『這個回饋迴路有沒有人用』」這個目標來說，Postgres 表是過度工程。它綁死 T0 拓樸（T1 零 infra 就用不了）、需要 migration、需要寫入路徑、需要處理 reviewer 標記與 analyzer 寫入的競態——全部都是在「還不知道 reviewer 會不會真的去按 label」之前就付出的成本。真正稀缺的不是儲存，是**訊號本身**（reviewer 願不願意標記誤報）。
+
+**現在做法**：用 GitLab MR label `releaseguard:false-positive` 當唯一資料來源。renderer 在 HOLD/REVIEW 的 comment 結尾加一行邀請 reviewer 標記；`analyzer feedback` 子指令掃近期已合併 MR，把 ReleaseGuard 自己貼的 decision（從 comment 標記字串解析）跟 label 比對，算出 HOLD count / 誤報數 / precision %。零 migration、零新表、T0 T1 都能跑。GitLab 本身就是資料庫。
+
+**學到什麼**：**MVP 的瓶頸通常是訊號取得，不是訊號儲存**。在還沒證明「人會提供這個訊號」之前，把儲存做重是把成本花在錯的地方。另外一個副作用是誠實邊界：selective-test 的信心常數（`internal/agents/testselect/confidence.go`）目前是工程估計值、尚未校準——這條回饋迴路收集到的 precision 資料，正是未來校準那些常數的依據。先把量測管道打通（即使很陽春），比先把儲存做完整更能推進校準這件事。
+
+---
+
 ## 跨決策的觀察
 
 回頭看這 17 個決策，可以歸納出幾個**反覆出現的設計判斷模式**：

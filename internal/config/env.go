@@ -20,6 +20,7 @@ type Config struct {
 	PostgresURL                string
 	AIProvider                 string
 	AIProviderKey              string
+	AIModel                    string
 	GitLabToken                string
 	GitLabAPIBase              string
 	ProjectsDir                string
@@ -30,6 +31,7 @@ type Config struct {
 	ReviewerSelfReflection     bool
 	CoverageFormat             string
 	DocsRepoNames              string
+	ReportPath                 string
 
 	// Caller-provided pipeline variables (per-MR).
 	TargetServiceName  string
@@ -102,6 +104,17 @@ func strEnv(key, def string) string {
 	return v
 }
 
+// reportPathEnv resolves RG_REPORT_PATH. Unlike strEnv, an explicitly-set empty
+// string disables report writing; only a completely unset var falls back to the
+// default filename.
+func reportPathEnv() string {
+	v, ok := os.LookupEnv("RG_REPORT_PATH")
+	if !ok {
+		return "releaseguard-report.json"
+	}
+	return v
+}
+
 func Load() (*Config, error) {
 	c := &Config{
 		Agents: AgentFlags{
@@ -114,6 +127,7 @@ func Load() (*Config, error) {
 		PostgresURL:                os.Getenv("POSTGRES_URL"),
 		AIProvider:                 strEnv("AI_PROVIDER", "anthropic"),
 		AIProviderKey:              os.Getenv("AI_PROVIDER_KEY"),
+		AIModel:                    strEnv("RG_AI_MODEL", "claude-sonnet-4-6"),
 		GitLabToken:                os.Getenv("GITLAB_TOKEN"),
 		GitLabAPIBase:              strEnv("GITLAB_API_BASE", "https://gitlab.com/api/v4"),
 		ProjectsDir:                strEnv("PROJECTS_DIR", "/app/projects"),
@@ -124,6 +138,7 @@ func Load() (*Config, error) {
 		ReviewerSelfReflection:     boolEnv("RG_REVIEWER_SELF_REFLECTION", false),
 		CoverageFormat:             strEnv("COVERAGE_FORMAT", "lcov"),
 		DocsRepoNames:              os.Getenv("DOCS_REPO_NAMES"),
+		ReportPath:                 reportPathEnv(),
 
 		TargetServiceName:  os.Getenv("RG_SERVICE_NAME"),
 		TargetServiceTypes: parseServiceTypes(os.Getenv("RG_SERVICE_TYPE")),

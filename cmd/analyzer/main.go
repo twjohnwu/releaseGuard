@@ -23,6 +23,15 @@ import (
 )
 
 func main() {
+	// Minimal subcommand routing. With no subcommand (or any arg that is not a
+	// known subcommand), the default analyzer behavior runs unchanged.
+	if len(os.Args) > 1 && os.Args[1] == "feedback" {
+		if err := runFeedback(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -64,7 +73,7 @@ func run() error {
 		}
 	}
 
-	prov := ai.NewAnthropic(cfg.AIProviderKey, "claude-3-5-sonnet-20241022")
+	prov := ai.NewAnthropic(cfg.AIProviderKey, cfg.AIModel)
 	gl := gitlab.NewClient(cfg.GitLabAPIBase, cfg.GitLabToken)
 
 	diff, err := gl.GetMRDiff(cfg.CIProjectID, cfg.CIMergeRequestIID)
@@ -105,7 +114,11 @@ func run() error {
 		Ownership:     cfg.Agents.Ownership,
 		AIReviewer:    cfg.Agents.AIReviewer,
 	}
-	md := result.Compose(outs, flags)
+	md, decision := result.ComposeWithDecision(outs, flags)
+
+	if err := result.WriteReport(cfg.ReportPath, decision, outs); err != nil {
+		log.Warn("report artifact write failed (continuing)", "path", cfg.ReportPath, "err", err)
+	}
 
 	requiredTests, confidence := selectiveTestSummary(outs)
 	writeArtifact := flags.SelectiveTest && confidence >= cfg.SelectiveTestMinConfidence

@@ -10,7 +10,7 @@ import (
 func runL1(diff []interfaces.DiffFile) (required, skippable []string, confidence float64, reason string) {
 	required = []string{}
 	skippable = []string{}
-	confidence = 0.5
+	confidence = L1BaseConfidence
 	hasGo, hasTS, hasOther := false, false, false
 	dirs := map[string]struct{}{}
 	for _, f := range diff {

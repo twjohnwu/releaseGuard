@@ -43,7 +43,7 @@ flowchart TB
 
     subgraph T1[Topology 1 — Zero-infra]
         T1A[Analyzer 單一容器]
-        T1F1[Selective Test L1<br/>路徑啟發 信心 0.6]
+        T1F1[Selective Test L1<br/>路徑啟發 信心 0.5]
         T1F2[Ownership proximity<br/>路徑相近度]
         T1F3[每次乾淨啟動]
     end
