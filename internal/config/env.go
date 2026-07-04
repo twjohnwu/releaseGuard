@@ -125,8 +125,8 @@ func Load() (*Config, error) {
 		CoverageFormat:             strEnv("COVERAGE_FORMAT", "lcov"),
 		DocsRepoNames:              os.Getenv("DOCS_REPO_NAMES"),
 
-		TargetServiceName:  os.Getenv("TARGET_SERVICE_NAME"),
-		TargetServiceTypes: parseServiceTypes(os.Getenv("TARGET_SERVICE_TYPE")),
+		TargetServiceName:  os.Getenv("RG_SERVICE_NAME"),
+		TargetServiceTypes: parseServiceTypes(os.Getenv("RG_SERVICE_TYPE")),
 		CommitSHA:          os.Getenv("CI_COMMIT_SHA"),
 		CIProjectID:        intEnv("CI_PROJECT_ID", 0),
 		CIMergeRequestIID:  intEnv("CI_MERGE_REQUEST_IID", 0),

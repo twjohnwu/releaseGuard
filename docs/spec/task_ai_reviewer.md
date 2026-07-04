@@ -106,15 +106,15 @@ type ToolSpec struct {
 
 ## Base Prompt 載入規則（Channel A）
 
-### TARGET_SERVICE_TYPE 解析
+### RG_SERVICE_TYPE 解析
 
-caller 透過 `.gitlab-ci.yml` job `variables:` 傳入逗號分隔 list，例如 `TARGET_SERVICE_TYPE=backend,frontend`。
+caller 透過 `.gitlab-ci.yml` job `variables:` 傳入逗號分隔 list，例如 `RG_SERVICE_TYPE=backend,frontend`。
 
 Fallback 鏈（四層 fallback，不另設 server-side 預設變數）：
 
 ```
 ① system.yaml.serviceTypeOverrides[serviceName]   ← 單值，命中後直接返回，不繼續往下
-② caller env (TARGET_SERVICE_TYPE list)
+② caller env (RG_SERVICE_TYPE list)
 ③ system.yaml.defaultServiceType                  ← 單值
 ④ 字面值 "backend"
 ```

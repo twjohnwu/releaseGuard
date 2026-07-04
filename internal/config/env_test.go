@@ -88,8 +88,8 @@ func TestLoadConfigPipelineVars(t *testing.T) {
 	withEnv(map[string]string{
 		"AI_PROVIDER_KEY":         "key",
 		"GITLAB_TOKEN":            "tok",
-		"TARGET_SERVICE_NAME":     "checkout-svc",
-		"TARGET_SERVICE_TYPE":     "backend, worker",
+		"RG_SERVICE_NAME":     "checkout-svc",
+		"RG_SERVICE_TYPE":     "backend, worker",
 		"CI_COMMIT_SHA":           "abc123",
 		"CI_PROJECT_ID":           "42",
 		"CI_MERGE_REQUEST_IID":    "7",

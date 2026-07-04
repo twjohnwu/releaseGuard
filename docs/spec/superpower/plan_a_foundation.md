@@ -2043,8 +2043,8 @@ include:
 releaseguard-review:
   extends: .releaseguard-full
   variables:
-    TARGET_SERVICE_NAME: my-service
-    TARGET_SERVICE_TYPE: backend
+    RG_SERVICE_NAME: my-service
+    RG_SERVICE_TYPE: backend
 \`\`\`
 ```
 

@@ -33,8 +33,8 @@ x-analyzer-env: &analyzer-env
   RG_AGENT_AI_REVIEWER_ENABLED: "false"
   RG_RAG_ENABLED: "false"
   POSTGRES_URL: ""
-  TARGET_SERVICE_NAME: "demo-service"
-  TARGET_SERVICE_TYPE: "backend"
+  RG_SERVICE_NAME: "demo-service"
+  RG_SERVICE_TYPE: "backend"
   SELECTIVE_TEST_MIN_CONFIDENCE: "0.5"
   ANALYZE_TIMEOUT_SEC: "60"
 

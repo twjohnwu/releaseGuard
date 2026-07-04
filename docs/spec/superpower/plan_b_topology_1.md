@@ -2781,8 +2781,8 @@ func run() error {
 	agents := buildAgents(cfg.Agents.SelectiveTest, cfg.Agents.RolloutRisk,
 		cfg.Agents.Ownership, cfg.Agents.AIReviewer, hasDB,
 		buildAgentsDeps{prov: prov, projectsDir: cfg.ProjectsDir,
-			systemName: os.Getenv("TARGET_SERVICE_NAME"),
-			serviceTypes: parseServiceTypes(os.Getenv("TARGET_SERVICE_TYPE"))})
+			systemName: os.Getenv("RG_SERVICE_NAME"),
+			serviceTypes: parseServiceTypes(os.Getenv("RG_SERVICE_TYPE"))})
 
 	outs := runAgentsParallel(ctx, agents, in)
 

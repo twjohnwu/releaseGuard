@@ -2509,8 +2509,8 @@ if cfg.PostgresURL != "" {
 		log.Warn("repo not registered, skipping DB-backed agents")
 	}
 	deps := buildAgentsDeps{prov: prov, projectsDir: cfg.ProjectsDir,
-		systemName: os.Getenv("TARGET_SERVICE_NAME"),
-		serviceTypes: parseServiceTypes(os.Getenv("TARGET_SERVICE_TYPE")),
+		systemName: os.Getenv("RG_SERVICE_NAME"),
+		serviceTypes: parseServiceTypes(os.Getenv("RG_SERVICE_TYPE")),
 		pool: pool, repoID: repoID}
 	agents := buildAgents(cfg.Agents.SelectiveTest, cfg.Agents.RolloutRisk,
 		cfg.Agents.Ownership, cfg.Agents.AIReviewer, true, deps)

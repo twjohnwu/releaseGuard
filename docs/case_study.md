@@ -264,7 +264,7 @@ COVERAGE_ARTIFACT_PATH=$LCOV \
 ```bash
 POSTGRES_URL="postgresql://postgres:postgres@localhost:5432/releaseguard_dev" \
   GITLAB_API_BASE="http://localhost:8080/api/v4" \
-  TARGET_SERVICE_NAME=releaseGuard \
+  RG_SERVICE_NAME=releaseGuard \
   RG_AGENT_OWNERSHIP_ENABLED=true \
   CI_PROJECT_ID=4 CI_MERGE_REQUEST_IID=4 \
   ./bin/analyzer

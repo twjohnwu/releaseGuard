@@ -229,7 +229,7 @@ Stage 2 對「本次 MR 的 commit messages + truncated diff summary」現場呼
 ```
 _shared/*.md (根層、字母排序)
   ↓
-_shared/<service_type>/*.md  ← 對 TARGET_SERVICE_TYPE list 中每個 type 跑一次
+_shared/<service_type>/*.md  ← 對 RG_SERVICE_TYPE list 中每個 type 跑一次
   ↓
 <systemName>/*.md
   ↓
@@ -247,14 +247,14 @@ ReleaseGuard 的執行需要兩類來源的變數，**界線清楚不能混**：
 | 類別 | 設定位置 | 誰擁有 | 範例 | 安全等級 |
 |---|---|---|---|---|
 | **Server-side 配置** | ReleaseGuard 自己的 GitLab project → CI/CD Variables（Protected + Masked），或 Docker image 啟動環境注入 | ReleaseGuard / 平台團隊 | `POSTGRES_URL`、`AI_PROVIDER_KEY`、`GITLAB_TOKEN`、`CALLGRAPH_IMAGE`、`RG_AGENT_*_ENABLED`、`RG_RAG_ENABLED`、`PROJECTS_DIR`、`PROMPT_MAX_TOKENS`、`SELECTIVE_TEST_MIN_CONFIDENCE`、`OWNERSHIP_LOOKBACK_DAYS`、`ANALYZE_TIMEOUT_SEC` | 含 secret，**caller 不可寫** |
-| **Caller-provided pipeline 變數** | caller repo 的 `.gitlab-ci.yml` job `variables:` 區塊 | 各 service repo 維護者 | `TARGET_SERVICE_NAME`、`TARGET_SERVICE_TYPE` | 純識別資訊，無 secret |
+| **Caller-provided pipeline 變數** | caller repo 的 `.gitlab-ci.yml` job `variables:` 區塊 | 各 service repo 維護者 | `RG_SERVICE_NAME`、`RG_SERVICE_TYPE` | 純識別資訊，無 secret |
 | **GitLab 自動注入** | 不用設定 | GitLab Runner | `CI_PROJECT_ID`、`CI_MERGE_REQUEST_IID`、`CI_COMMIT_REF_NAME`、`CI_MERGE_REQUEST_TARGET_BRANCH_NAME` | 自動帶入 |
 
 ### 設計原則
 
 - **Secret 不外流**：DB 連線字串、API key 永遠在 ReleaseGuard 自己的 protected variables，caller repo 完全不持有
 - **拓樸決策的單一來源**：拓樸 0 / 拓樸 1 是 ReleaseGuard 部署決策，不允許 caller 覆寫
-- **caller 只負責「我是誰」**：`TARGET_SERVICE_NAME` / `TARGET_SERVICE_TYPE` 是 service 識別資訊，由各 repo 自主管理
+- **caller 只負責「我是誰」**：`RG_SERVICE_NAME` / `RG_SERVICE_TYPE` 是 service 識別資訊，由各 repo 自主管理
 
 ### Caller `.gitlab-ci.yml` 應該長什麼樣
 
@@ -267,8 +267,8 @@ include:
 releaseguard-review:
   extends: .releaseguard-full
   variables:
-    TARGET_SERVICE_NAME: payments-api
-    TARGET_SERVICE_TYPE: backend
+    RG_SERVICE_NAME: payments-api
+    RG_SERVICE_TYPE: backend
     # ❌ 不要寫 POSTGRES_URL、AI_PROVIDER_KEY、RG_AGENT_*
     # 這些都已經在 ReleaseGuard project 的 protected variables 注入
 ```
@@ -281,8 +281,8 @@ releaseguard-review:
 
 | Variable | 範例 | 說明 |
 |---|---|---|
-| `TARGET_SERVICE_NAME` | `payments-api` | 服務名，對應 `projects/registry.yaml` 的 key |
-| `TARGET_SERVICE_TYPE` | `backend,frontend` | 逗號分隔 list；fallback chain：① `serviceTypeOverrides[serviceName]` → ② 此 env list → ③ `system.yaml.defaultServiceType` → ④ 字面值 `"backend"` |
+| `RG_SERVICE_NAME` | `payments-api` | 服務名，對應 `projects/registry.yaml` 的 key |
+| `RG_SERVICE_TYPE` | `backend,frontend` | 逗號分隔 list；fallback chain：① `serviceTypeOverrides[serviceName]` → ② 此 env list → ③ `system.yaml.defaultServiceType` → ④ 字面值 `"backend"` |
 | `CI_PROJECT_ID` | `123` | GitLab 自動提供 |
 | `CI_MERGE_REQUEST_IID` | `45` | GitLab 自動提供 |
 | `CI_COMMIT_REF_NAME` | `feat/orders-rewrite` | source branch（GitLab 自動提供） |
@@ -294,8 +294,8 @@ caller `.gitlab-ci.yml` 範例：
 ai-review:
   extends: .releaseguard-full
   variables:
-    TARGET_SERVICE_NAME: payments-api
-    TARGET_SERVICE_TYPE: backend,frontend
+    RG_SERVICE_NAME: payments-api
+    RG_SERVICE_TYPE: backend,frontend
 ```
 
 ---
@@ -325,7 +325,7 @@ ai-review:
 | `DOCS_REPO_NAMES` | `docs/api,docs/proto` | 中央 spec repo 名單（逗號分隔）。drift detector 與 PlantUML parser 用：標出哪些 repo 持有跨服務的 OpenAPI / Protobuf / `.puml` 檔 |
 | `EMBEDDING_RATE_LIMIT_RPM` | `60` | backfill subcommand 對 embedding API 的每分鐘呼叫上限，避免一次性 ingest 觸發 provider rate limit |
 
-> `TARGET_SERVICE_TYPE` 與 `TARGET_SERVICE_NAME` 不在此表——它們是 **caller-provided pipeline variables**（見下方專屬小節），不是 ReleaseGuard server config。
+> `RG_SERVICE_TYPE` 與 `RG_SERVICE_NAME` 不在此表——它們是 **caller-provided pipeline variables**（見下方專屬小節），不是 ReleaseGuard server config。
 
 `AI_REVIEW_METRICS_FILE` 從規範中明確排除——telemetry 由 Postgres `mr_runs` / `agent_outputs` 取代。PoC 階段 log 一律 debug，不設 `LOG_LEVEL`。
 
