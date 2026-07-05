@@ -169,6 +169,8 @@ TestOrderCreate|TestCheckoutFlow|TestPromoApplication
 
 如果 `confidence < SELECTIVE_TEST_MIN_CONFIDENCE`（預設 0.85）或 agent disabled → **不**寫此檔，CI 的 `test-full` 接手。
 
+> 注意兩個閾值的分工：`SELECTIVE_TEST_MIN_CONFIDENCE` 是 env-driven（config 傳入），只決定**要不要寫 selective-tests.txt artifact**；`PartialStatusThreshold`（hardcoded 0.5，見 `internal/agents/testselect/confidence.go`）則控制 agent 內部的 `status=partial` 判定。兩者作用在不同層，互不影響。
+
 ---
 
 ## 與 Arbitration 的關係（避免拓樸 1 spam REVIEW）

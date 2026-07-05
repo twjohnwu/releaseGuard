@@ -34,3 +34,13 @@ Topology 0 (Postgres-backed) infrastructure:
 - Selective Test L2 (coverage_map intersect) + L3 (reverse BFS on edges) with confidence calculation
 - Ownership Agent in proximity mode (no score, no kind, shuffled output, banned ranking words enforced by lint)
 - analyzer wires NewWithDB testselect + ownership when POSTGRES_URL configured
+
+## Hardening round: complete (commits 6526efb, 0964ed0)
+
+Naming, transparency, and feedback-loop pass (Plan D / RAG remains spec-only):
+- Renamed caller-provided env vars TARGET_SERVICE_* → RG_SERVICE_* to match the RG_ prefix convention (breaking: callers must update their .gitlab-ci.yml variables)
+- RG_AI_MODEL env replaces the hardcoded Anthropic model id (default claude-sonnet-4-6); Cost section added to both READMEs
+- Selective Test confidence values centralized as named constants (testselect/confidence.go); docs aligned to actual L1=0.5
+- SPEC ONLY — NOT IMPLEMENTED banners on Channel B / self-reflection / Plan D specs; implementation-status table in both READMEs
+- RG_REPORT_PATH writes a per-run JSON report (decision, triggered signals, agent outputs), exposed as a GitLab CI artifact
+- False-positive feedback loop: HOLD/REVIEW comment footer invites the releaseguard:false-positive label; new `analyzer feedback` subcommand reports HOLD precision (see decisions_log #18)

@@ -181,7 +181,7 @@ demo 對自己的弱點誠實：
 - **AI Reviewer 在這份 demo 是關閉的**（`RG_AGENT_AI_REVIEWER_ENABLED=false`），不會打真的 Anthropic API。如果接上真 key + 填好 `PROJECTS_DIR`，reviewer 就會把它的結構化 finding 餵進同一個仲裁層。
 - **Ownership Agent 不在 demo 裡**——Plan B 為「政治中性」考量刻意排除，紀錄在 `decisions_log.md` 第 4 條。Renderer 雖然有 `SuggestedReviewers` / `ImpactZones` 的 stub，但在 topology 1 維持空白。
 
-這些限制是**設計的一部分**，不是 bug。PoC 範圍寫在 `docs/spec/README.md` 與 `decisions_log.md` Decision #7（Topology 1）。
+這些限制是**設計的一部分**，不是 bug。PoC 範圍寫在 `docs/spec/plan.md` 與 `decisions_log.md` Decision #7（Topology 1）。
 
 ---
 
