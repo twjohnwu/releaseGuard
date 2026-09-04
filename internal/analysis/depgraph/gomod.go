@@ -2,6 +2,7 @@ package depgraph
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,13 +13,13 @@ import (
 // reuse schema.Zone type since it's the same shape
 type Zone = schema.Zone
 
-func parseGoMod(path string) (map[string]string, error) {
+func parseGoMod(path string) (deps map[string]string, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	deps := map[string]string{}
+	defer func() { err = errors.Join(err, f.Close()) }()
+	deps = map[string]string{}
 	sc := bufio.NewScanner(f)
 	inBlock := false
 	for sc.Scan() {

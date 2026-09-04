@@ -29,7 +29,10 @@ func TestRiskLevelMEDOnAccumulation(t *testing.T) {
 		{Type: "dep_bump", Severity: "medium"},
 		{Type: "dep_bump", Severity: "medium"},
 	}
-	out, _ := a.Run(context.Background(), interfaces.AgentInput{})
+	out, err := a.Run(context.Background(), interfaces.AgentInput{})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
 	if out.Metadata["riskLevel"] != "MED" {
 		t.Fatalf("expected MED, got %v", out.Metadata["riskLevel"])
 	}
@@ -37,7 +40,10 @@ func TestRiskLevelMEDOnAccumulation(t *testing.T) {
 
 func TestRiskLevelLOWWhenEmpty(t *testing.T) {
 	a := New(Deps{})
-	out, _ := a.Run(context.Background(), interfaces.AgentInput{})
+	out, err := a.Run(context.Background(), interfaces.AgentInput{})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
 	if out.Metadata["riskLevel"] != "LOW" {
 		t.Fatalf("expected LOW, got %v", out.Metadata["riskLevel"])
 	}

@@ -47,7 +47,7 @@ func Detect(diff []interfaces.DiffFile, specPaths []string) []interfaces.Finding
 
 func looksLikeHandler(path string) bool {
 	low := strings.ToLower(path)
-	if !(strings.HasSuffix(low, ".go") || strings.HasSuffix(low, ".ts") || strings.HasSuffix(low, ".tsx")) {
+	if !strings.HasSuffix(low, ".go") && !strings.HasSuffix(low, ".ts") && !strings.HasSuffix(low, ".tsx") {
 		return false
 	}
 	keys := []string{"handler", "controller", "/api/", "/routes/", "/endpoints/"}

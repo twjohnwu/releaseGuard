@@ -16,16 +16,27 @@ func TestZonesGroupsByTopLevelDir(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	pool, _ := storage.NewPool(ctx, url)
+	pool, err := storage.NewPool(ctx, url)
+	if err != nil {
+		t.Fatalf("new pool: %v", err)
+	}
 	defer pool.Close()
-	storage.MigrateUp(ctx, pool, "../../../migrations")
+	if err := storage.MigrateUp(ctx, pool, "../../../migrations"); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 
-	pool.Exec(ctx, "INSERT INTO repos(name) VALUES('zones-test') ON CONFLICT DO NOTHING")
+	if _, err := pool.Exec(ctx, "INSERT INTO repos(name) VALUES('zones-test') ON CONFLICT DO NOTHING"); err != nil {
+		t.Fatalf("insert repo: %v", err)
+	}
 	var rid int64
-	pool.QueryRow(ctx, "SELECT id FROM repos WHERE name='zones-test'").Scan(&rid)
+	if err := pool.QueryRow(ctx, "SELECT id FROM repos WHERE name='zones-test'").Scan(&rid); err != nil {
+		t.Fatalf("select repo: %v", err)
+	}
 	for _, a := range []string{"a@x.com", "b@x.com", "c@x.com"} {
-		pool.Exec(ctx, `INSERT INTO ownership_signals(repo_id, file_path, author, blame_weight, recency_score)
-			VALUES($1, 'orders/handler.go', $2, 0.3, 0.9) ON CONFLICT DO NOTHING`, rid, a)
+		if _, err := pool.Exec(ctx, `INSERT INTO ownership_signals(repo_id, file_path, author, blame_weight, recency_score)
+			VALUES($1, 'orders/handler.go', $2, 0.3, 0.9) ON CONFLICT DO NOTHING`, rid, a); err != nil {
+			t.Fatalf("insert ownership signal: %v", err)
+		}
 	}
 	zs, err := computeZones(ctx, pool, rid, []string{"orders/handler.go", "payments/svc.go"})
 	if err != nil {

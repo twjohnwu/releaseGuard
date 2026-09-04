@@ -31,12 +31,15 @@ func TestL1MapsFileToTestSamePackage(t *testing.T) {
 
 func TestL1ConfidenceCapped(t *testing.T) {
 	a := New(false)
-	out, _ := a.Run(context.Background(), interfaces.AgentInput{
+	out, err := a.Run(context.Background(), interfaces.AgentInput{
 		Diff: []interfaces.DiffFile{
 			{Path: "x.go", Status: "modified"},
 			{Path: "y.ts", Status: "modified"}, // mixed languages
 		},
 	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
 	conf := out.Metadata["confidence"].(float64)
 	if conf > 0.6 {
 		t.Fatalf("L1 confidence must be <= 0.6 (mixed lang penalty), got %f", conf)
@@ -45,12 +48,15 @@ func TestL1ConfidenceCapped(t *testing.T) {
 
 func TestL1SkipsNonGoTestPaths(t *testing.T) {
 	a := New(false)
-	out, _ := a.Run(context.Background(), interfaces.AgentInput{
+	out, err := a.Run(context.Background(), interfaces.AgentInput{
 		Diff: []interfaces.DiffFile{
 			{Path: "internal/foo.go", Status: "modified"},
 			{Path: "config/x.yaml", Status: "modified"},
 		},
 	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
 	required := out.Metadata["required"].([]string)
 	for _, r := range required {
 		if strings.HasSuffix(r, ".yaml_test.go") || strings.HasSuffix(r, ".yml_test.go") {
@@ -61,11 +67,14 @@ func TestL1SkipsNonGoTestPaths(t *testing.T) {
 
 func TestL1SkipsRootDotGlob(t *testing.T) {
 	a := New(false)
-	out, _ := a.Run(context.Background(), interfaces.AgentInput{
+	out, err := a.Run(context.Background(), interfaces.AgentInput{
 		Diff: []interfaces.DiffFile{
 			{Path: "README.md", Status: "modified"},
 		},
 	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
 	required := out.Metadata["required"].([]string)
 	for _, r := range required {
 		if r == "./..." {

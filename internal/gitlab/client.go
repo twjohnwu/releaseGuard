@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -39,7 +40,11 @@ func (c *Client) do(method, path string, body []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("close GitLab response body: %v", err)
+		}
+	}()
 	out, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

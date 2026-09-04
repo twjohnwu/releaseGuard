@@ -65,7 +65,10 @@ func stepCochange(ctx context.Context, pool *storage.Pool, repoID int64, repoPat
 			continue
 		}
 		recency := math.Exp(-1.0 / float64(lookback))
-		ccJSON, _ := encodeCoChange(peers)
+		ccJSON, err := encodeCoChange(peers)
+		if err != nil {
+			return err
+		}
 		for email, lines := range authors {
 			weight := float64(lines) / float64(total)
 			_, err := pool.Exec(ctx, `
@@ -113,8 +116,8 @@ func getLookbackDays() int {
 	if v == "" {
 		return 180
 	}
-	n, _ := strconv.Atoi(v)
-	if n <= 0 {
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
 		return 180
 	}
 	return n

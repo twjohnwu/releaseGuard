@@ -17,13 +17,15 @@ func TestAnthropicCallWithToolReturnsToolInput(t *testing.T) {
 			t.Errorf("missing api key header")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{
+		if _, err := w.Write([]byte(`{
 			"content": [{
 				"type": "tool_use",
 				"name": "submit_review",
 				"input": {"findings": [{"title": "x"}]}
 			}]
-		}`))
+		}`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -50,7 +52,9 @@ func TestAnthropicCallWithToolReturnsToolInput(t *testing.T) {
 func TestAnthropicErrorPropagates(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
-		w.Write([]byte(`{"error":"oops"}`))
+		if _, err := w.Write([]byte(`{"error":"oops"}`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer srv.Close()
 	p := NewAnthropic("k", "m")

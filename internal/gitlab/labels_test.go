@@ -12,7 +12,9 @@ func TestGetMRLabels(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"iid":3,"title":"x","labels":["releaseguard:false-positive","bug"]}`))
+		if _, err := w.Write([]byte(`{"iid":3,"title":"x","labels":["releaseguard:false-positive","bug"]}`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -36,7 +38,9 @@ func TestListMergedMRs(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		// fewer than per_page → single page
-		w.Write([]byte(`[{"iid":10,"title":"a","labels":[]},{"iid":11,"title":"b","labels":["releaseguard:false-positive"]}]`))
+		if _, err := w.Write([]byte(`[{"iid":10,"title":"a","labels":[]},{"iid":11,"title":"b","labels":["releaseguard:false-positive"]}]`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -56,7 +60,9 @@ func TestGetMRNotes(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`[{"body":"## 🔴 ReleaseGuard recommendation: HOLD"},{"body":"unrelated"}]`))
+		if _, err := w.Write([]byte(`[{"body":"## 🔴 ReleaseGuard recommendation: HOLD"},{"body":"unrelated"}]`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer srv.Close()
 

@@ -25,21 +25,29 @@ func stepPlantUML(ctx context.Context, pool *storage.Pool, repoID int64, repoPat
 		return err
 	}
 	var puml []string
-	filepath.Walk(repoPath, func(p string, info os.FileInfo, _ error) error {
+	if err := filepath.Walk(repoPath, func(p string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
 		if info != nil && !info.IsDir() &&
 			(strings.HasSuffix(p, ".puml") || strings.HasSuffix(p, ".plantuml")) {
 			puml = append(puml, p)
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
 	for _, p := range puml {
 		f, err := os.Open(p)
 		if err != nil {
 			continue
 		}
 		d, err := plantuml.Parse(f)
-		f.Close()
+		closeErr := f.Close()
 		if err != nil {
+			continue
+		}
+		if closeErr != nil {
 			continue
 		}
 		for _, in := range d.Interactions {
@@ -52,10 +60,12 @@ func stepPlantUML(ctx context.Context, pool *storage.Pool, repoID int64, repoPat
 			if dstOK {
 				dstID = lookupRepoID(ctx, pool, dstRepo)
 			}
-			pool.Exec(ctx, `
+			if _, err := pool.Exec(ctx, `
 				INSERT INTO cross_repo_edges(source_repo_id, target_repo_id, source_alias, target_alias, call_kind, source_diagram_path)
 				VALUES($1,$2,$3,$4,$5,$6)`,
-				srcID, dstID, in.Source, in.Target, in.Kind, p)
+				srcID, dstID, in.Source, in.Target, in.Kind, p); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

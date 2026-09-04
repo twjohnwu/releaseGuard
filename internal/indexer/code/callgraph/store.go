@@ -2,8 +2,11 @@ package callgraph
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
@@ -12,7 +15,13 @@ func UpsertResult(ctx context.Context, pool *storage.Pool, repoID int64, r *Buil
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		rollbackErr := tx.Rollback(ctx)
+		if rollbackErr == nil || errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			return
+		}
+		log.Printf("rollback call graph transaction: %v", rollbackErr)
+	}()
 
 	for _, s := range r.Symbols {
 		if _, err := tx.Exec(ctx, `

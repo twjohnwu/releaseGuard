@@ -14,16 +14,24 @@ func TestE2EMockGitLab(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %s", out)
 	}
-	defer os.Remove("/tmp/rg-analyzer-e2e")
+	t.Cleanup(func() {
+		if err := os.Remove("/tmp/rg-analyzer-e2e"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("remove analyzer binary: %v", err)
+		}
+	})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/diffs"):
 			w.WriteHeader(200)
-			w.Write([]byte(`[]`))
+			if _, err := w.Write([]byte(`[]`)); err != nil {
+				t.Errorf("write diffs response: %v", err)
+			}
 		case strings.HasSuffix(r.URL.Path, "/notes"):
 			w.WriteHeader(201)
-			w.Write([]byte(`{"id":1}`))
+			if _, err := w.Write([]byte(`{"id":1}`)); err != nil {
+				t.Errorf("write notes response: %v", err)
+			}
 		default:
 			w.WriteHeader(404)
 		}

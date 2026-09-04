@@ -10,15 +10,19 @@ func TestGoModDiff(t *testing.T) {
 	dir := t.TempDir()
 	base := filepath.Join(dir, "base.mod")
 	head := filepath.Join(dir, "head.mod")
-	os.WriteFile(base, []byte(`module x
+	if err := os.WriteFile(base, []byte(`module x
 go 1.23
 require github.com/foo/bar v1.0.0
-require github.com/baz/qux v2.0.0`), 0644)
-	os.WriteFile(head, []byte(`module x
+require github.com/baz/qux v2.0.0`), 0644); err != nil {
+		t.Fatalf("write base go.mod: %v", err)
+	}
+	if err := os.WriteFile(head, []byte(`module x
 go 1.23
 require github.com/foo/bar v2.0.0
 require github.com/baz/qux v2.0.0
-require github.com/new/dep v0.1.0`), 0644)
+require github.com/new/dep v0.1.0`), 0644); err != nil {
+		t.Fatalf("write head go.mod: %v", err)
+	}
 
 	zones, err := GoModDiff(base, head)
 	if err != nil {

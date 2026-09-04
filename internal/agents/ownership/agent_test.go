@@ -11,8 +11,14 @@ import (
 
 func TestOutputSchemaHasNoScoreField(t *testing.T) {
 	a := New(nil, 0)
-	out, _ := a.Run(context.Background(), interfaces.AgentInput{})
-	raw, _ := json.Marshal(out)
+	out, err := a.Run(context.Background(), interfaces.AgentInput{})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
 	if strings.Contains(string(raw), `"score":`) {
 		t.Fatalf("score must not appear in JSON: %s", raw)
 	}

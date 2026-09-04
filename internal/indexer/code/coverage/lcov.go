@@ -15,7 +15,6 @@ func (l *LCOV) Parse(r io.Reader) ([]Entry, error) {
 	var out []Entry
 	sc := bufio.NewScanner(r)
 	var curTest, curFile string
-	var curFn string
 	var curLine int
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
@@ -31,14 +30,13 @@ func (l *LCOV) Parse(r io.Reader) ([]Entry, error) {
 				if n, err := strconv.Atoi(parts[0]); err == nil {
 					curLine = n
 				}
-				curFn = parts[1]
 				out = append(out, Entry{
 					TestID: curTest, File: curFile,
-					FunctionName: curFn, LineStart: curLine, LineEnd: curLine,
+					FunctionName: parts[1], LineStart: curLine, LineEnd: curLine,
 				})
 			}
 		case line == "end_of_record":
-			curFile, curFn, curLine = "", "", 0
+			curFile, curLine = "", 0
 		}
 	}
 	return out, sc.Err()

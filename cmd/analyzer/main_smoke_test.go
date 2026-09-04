@@ -12,7 +12,11 @@ func TestMainSmokeTopologyCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %s", out)
 	}
-	defer os.Remove("/tmp/rg-analyzer")
+	t.Cleanup(func() {
+		if err := os.Remove("/tmp/rg-analyzer"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("remove analyzer binary: %v", err)
+		}
+	})
 
 	// Missing required env → exit 1, error message.
 	cmd := exec.Command("/tmp/rg-analyzer")

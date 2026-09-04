@@ -15,17 +15,25 @@ func TestE2ETopology1FullFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %s", out)
 	}
-	defer os.Remove("/tmp/rg-e2e-t1")
+	t.Cleanup(func() {
+		if err := os.Remove("/tmp/rg-e2e-t1"); err != nil && !os.IsNotExist(err) {
+			t.Errorf("remove analyzer binary: %v", err)
+		}
+	})
 
 	posted := false
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/diffs"):
-			w.Write([]byte(`[{"old_path":"foo.go","new_path":"foo.go","diff":"-x\n+y"}]`))
+			if _, err := w.Write([]byte(`[{"old_path":"foo.go","new_path":"foo.go","diff":"-x\n+y"}]`)); err != nil {
+				t.Errorf("write diffs response: %v", err)
+			}
 		case strings.HasSuffix(r.URL.Path, "/notes"):
 			posted = true
 			w.WriteHeader(201)
-			w.Write([]byte(`{"id":1}`))
+			if _, err := w.Write([]byte(`{"id":1}`)); err != nil {
+				t.Errorf("write notes response: %v", err)
+			}
 		default:
 			w.WriteHeader(404)
 		}

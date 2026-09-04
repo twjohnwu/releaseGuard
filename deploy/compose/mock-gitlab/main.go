@@ -1,11 +1,13 @@
 // Mock GitLab API server for local end-to-end testing of releaseguard analyzer.
 // Implements only the endpoints analyzer hits:
-//   GET  /api/v4/projects/:id/merge_requests/:iid/diffs   → fixture JSON
-//   POST /api/v4/projects/:id/merge_requests/:iid/notes   → 201 + log body to /artifacts/notes.log
+//
+//	GET  /api/v4/projects/:id/merge_requests/:iid/diffs   → fixture JSON
+//	POST /api/v4/projects/:id/merge_requests/:iid/notes   → 201 + log body to /artifacts/notes.log
 package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -92,7 +94,9 @@ func handleDiff(w http.ResponseWriter, r *http.Request, fixtureDir string) {
 	}
 	log.Printf("[200] %s %s -> served %s (%d bytes)", r.Method, r.URL.Path, fixture, len(body))
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(body)
+	if _, err := w.Write(body); err != nil {
+		log.Printf("write diff response: %v", err)
+	}
 }
 
 func handleNote(w http.ResponseWriter, r *http.Request, artifactsDir string) {
@@ -111,7 +115,9 @@ func handleNote(w http.ResponseWriter, r *http.Request, artifactsDir string) {
 	var payload struct {
 		Body string `json:"body"`
 	}
-	_ = json.Unmarshal(body, &payload)
+	if err := json.Unmarshal(body, &payload); err != nil {
+		log.Printf("decode note payload: %v", err)
+	}
 
 	projectID, mrIID := "", ""
 	if m := notePathRe.FindStringSubmatch(r.URL.Path); len(m) >= 3 {
@@ -139,7 +145,9 @@ func handleNote(w http.ResponseWriter, r *http.Request, artifactsDir string) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(`{"id":1}`))
+	if _, err := w.Write([]byte(`{"id":1}`)); err != nil {
+		log.Printf("write note response: %v", err)
+	}
 }
 
 func appendFile(path, s string) error {
@@ -147,9 +155,8 @@ func appendFile(path, s string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	_, err = f.WriteString(s)
-	return err
+	_, writeErr := f.WriteString(s)
+	return errors.Join(writeErr, f.Close())
 }
 
 func truncate(s string, n int) string {

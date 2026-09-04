@@ -9,14 +9,18 @@ import (
 
 func TestGoBuilderOnTinyFixture(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module fixture\ngo 1.23\n"), 0644)
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte(`package main
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module fixture\ngo 1.23\n"), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(`package main
 
 func A() { B() }
 func B() {}
 
 func main() { A() }
-`), 0644)
+`), 0644); err != nil {
+		t.Fatalf("write main.go: %v", err)
+	}
 
 	b := NewGoBuilder()
 	r, err := b.Build(context.Background(), dir)

@@ -40,7 +40,10 @@ func (b *GoBuilder) Build(ctx context.Context, repoPath string) (*BuildResult, e
 	out := &BuildResult{}
 	added := map[string]bool{}
 
-	absRepo, _ := filepath.Abs(repoPath)
+	absRepo, err := filepath.Abs(repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve repository path: %w", err)
+	}
 	for _, n := range cg.Nodes {
 		if n == nil || n.Func == nil {
 			continue

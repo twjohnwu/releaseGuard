@@ -6,20 +6,27 @@ import (
 	"testing"
 )
 
-func withEnv(env map[string]string, fn func()) {
+func withEnv(t *testing.T, env map[string]string, fn func()) {
+	t.Helper()
 	old := map[string]string{}
 	for k := range env {
 		old[k] = os.Getenv(k)
 	}
 	for k, v := range env {
-		os.Setenv(k, v)
+		if err := os.Setenv(k, v); err != nil {
+			t.Fatalf("set %s: %v", k, err)
+		}
 	}
 	defer func() {
 		for k, v := range old {
 			if v == "" {
-				os.Unsetenv(k)
+				if err := os.Unsetenv(k); err != nil {
+					t.Errorf("unset %s: %v", k, err)
+				}
 			} else {
-				os.Setenv(k, v)
+				if err := os.Setenv(k, v); err != nil {
+					t.Errorf("restore %s: %v", k, err)
+				}
 			}
 		}
 	}()
@@ -27,7 +34,7 @@ func withEnv(env map[string]string, fn func()) {
 }
 
 func TestLoadConfigDefaults(t *testing.T) {
-	withEnv(map[string]string{
+	withEnv(t, map[string]string{
 		"AI_PROVIDER":     "anthropic",
 		"AI_PROVIDER_KEY": "key",
 		"GITLAB_TOKEN":    "tok",
@@ -53,7 +60,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 }
 
 func TestLoadConfigAIModelOverride(t *testing.T) {
-	withEnv(map[string]string{
+	withEnv(t, map[string]string{
 		"AI_PROVIDER_KEY": "key",
 		"GITLAB_TOKEN":    "tok",
 		"RG_AI_MODEL":     "claude-opus-4-8",
@@ -69,7 +76,7 @@ func TestLoadConfigAIModelOverride(t *testing.T) {
 }
 
 func TestLoadConfigMissingRequired(t *testing.T) {
-	withEnv(map[string]string{}, func() {
+	withEnv(t, map[string]string{}, func() {
 		_, err := Load()
 		if err == nil {
 			t.Fatalf("expected error for missing required env")
@@ -105,7 +112,7 @@ func TestParseServiceTypes(t *testing.T) {
 }
 
 func TestLoadConfigPipelineVars(t *testing.T) {
-	withEnv(map[string]string{
+	withEnv(t, map[string]string{
 		"AI_PROVIDER_KEY":      "key",
 		"GITLAB_TOKEN":         "tok",
 		"RG_SERVICE_NAME":      "checkout-svc",
@@ -137,7 +144,7 @@ func TestLoadConfigPipelineVars(t *testing.T) {
 }
 
 func TestLoadConfigAgentTimeoutDefault(t *testing.T) {
-	withEnv(map[string]string{
+	withEnv(t, map[string]string{
 		"AI_PROVIDER_KEY":     "key",
 		"GITLAB_TOKEN":        "tok",
 		"ANALYZE_TIMEOUT_SEC": "45",
@@ -153,7 +160,7 @@ func TestLoadConfigAgentTimeoutDefault(t *testing.T) {
 }
 
 func TestLoadConfigAgentTimeoutRejectsGTAnalyzeTimeout(t *testing.T) {
-	withEnv(map[string]string{
+	withEnv(t, map[string]string{
 		"AI_PROVIDER_KEY":     "key",
 		"GITLAB_TOKEN":        "tok",
 		"ANALYZE_TIMEOUT_SEC": "60",
@@ -167,7 +174,7 @@ func TestLoadConfigAgentTimeoutRejectsGTAnalyzeTimeout(t *testing.T) {
 }
 
 func TestLoadConfigAgentTimeoutAcceptsEqualAnalyzeTimeout(t *testing.T) {
-	withEnv(map[string]string{
+	withEnv(t, map[string]string{
 		"AI_PROVIDER_KEY":     "key",
 		"GITLAB_TOKEN":        "tok",
 		"ANALYZE_TIMEOUT_SEC": "60",
@@ -184,7 +191,7 @@ func TestLoadConfigAgentTimeoutAcceptsEqualAnalyzeTimeout(t *testing.T) {
 }
 
 func TestLoadConfigAgentTimeoutRejectsZero(t *testing.T) {
-	withEnv(map[string]string{
+	withEnv(t, map[string]string{
 		"AI_PROVIDER_KEY":   "key",
 		"GITLAB_TOKEN":      "tok",
 		"AGENT_TIMEOUT_SEC": "0",

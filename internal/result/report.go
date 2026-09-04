@@ -2,6 +2,7 @@ package result
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -56,17 +57,17 @@ func WriteReport(path string, rec report.Recommendation, outs []interfaces.Agent
 	}
 	tmpName := tmp.Name()
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return fmt.Errorf("write temp report: %w", err)
+		closeErr := tmp.Close()
+		removeErr := os.Remove(tmpName)
+		return fmt.Errorf("write temp report: %w", errors.Join(err, closeErr, removeErr))
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("close temp report: %w", err)
+		removeErr := os.Remove(tmpName)
+		return fmt.Errorf("close temp report: %w", errors.Join(err, removeErr))
 	}
 	if err := os.Rename(tmpName, path); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("rename report: %w", err)
+		removeErr := os.Remove(tmpName)
+		return fmt.Errorf("rename report: %w", errors.Join(err, removeErr))
 	}
 	return nil
 }

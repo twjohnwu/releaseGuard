@@ -121,7 +121,10 @@ func agentTimeoutEnv(analyzeTimeoutSec int) int {
 	if !ok || v == "" {
 		return analyzeTimeoutSec
 	}
-	n, _ := strconv.Atoi(v)
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return 0
+	}
 	return n
 }
 

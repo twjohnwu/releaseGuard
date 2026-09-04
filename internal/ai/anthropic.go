@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -69,10 +70,13 @@ func (a *Anthropic) CallWithTool(ctx context.Context, system string, msgs []Mess
 		}},
 		ToolChoice: anthropicToolChoice{Type: "tool", Name: tool.Name},
 	}
-	body, _ := json.Marshal(req)
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
 
 	var raw json.RawMessage
-	err := Retry(ctx, 3, 500*time.Millisecond, func() error {
+	err = Retry(ctx, 3, 500*time.Millisecond, func() error {
 		httpReq, err := http.NewRequestWithContext(ctx, "POST", a.endpoint, bytes.NewReader(body))
 		if err != nil {
 			return err
@@ -85,8 +89,15 @@ func (a *Anthropic) CallWithTool(ctx context.Context, system string, msgs []Mess
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
-		out, _ := io.ReadAll(resp.Body)
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				log.Printf("close Anthropic response body: %v", err)
+			}
+		}()
+		out, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read response: %w", err)
+		}
 		if resp.StatusCode >= 400 {
 			return fmt.Errorf("anthropic %d: %s", resp.StatusCode, string(out))
 		}

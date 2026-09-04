@@ -2,14 +2,16 @@
 // stream, attributing all hit functions to a single test name supplied via -tn.
 //
 // Usage:
-//   cover2lcov -tn=TestX -module=github.com/twjohnwu/releaseGuard cover.out
+//
+//	cover2lcov -tn=TestX -module=github.com/twjohnwu/releaseGuard cover.out
 //
 // Output (stdout):
-//   TN:TestX
-//   SF:internal/report/arbitration.go
-//   FN:33,Arbitrate
-//   FN:43,arbitrateInner
-//   end_of_record
+//
+//	TN:TestX
+//	SF:internal/report/arbitration.go
+//	FN:33,Arbitrate
+//	FN:43,arbitrateInner
+//	end_of_record
 //
 // Only functions with non-zero coverage are emitted. Module-prefixed file
 // paths are stripped to repo-relative form so they match `symbols.file`.
@@ -107,16 +109,26 @@ func run(coverPath, testName, modulePrefix string, out io.Writer) error {
 	}
 	sort.Strings(sortedSFs)
 	w := bufio.NewWriter(out)
-	defer w.Flush()
 	for _, sf := range sortedSFs {
 		fns := bySF[sf]
 		sort.Slice(fns, func(i, j int) bool { return fns[i].Line < fns[j].Line })
-		fmt.Fprintf(w, "TN:%s\n", testName)
-		fmt.Fprintf(w, "SF:%s\n", sf)
-		for _, fn := range fns {
-			fmt.Fprintf(w, "FN:%d,%s\n", fn.Line, fn.Name)
+		if _, err := fmt.Fprintf(w, "TN:%s\n", testName); err != nil {
+			return fmt.Errorf("write test name: %w", err)
 		}
-		fmt.Fprintln(w, "end_of_record")
+		if _, err := fmt.Fprintf(w, "SF:%s\n", sf); err != nil {
+			return fmt.Errorf("write source file: %w", err)
+		}
+		for _, fn := range fns {
+			if _, err := fmt.Fprintf(w, "FN:%d,%s\n", fn.Line, fn.Name); err != nil {
+				return fmt.Errorf("write function: %w", err)
+			}
+		}
+		if _, err := fmt.Fprintln(w, "end_of_record"); err != nil {
+			return fmt.Errorf("write record terminator: %w", err)
+		}
+	}
+	if err := w.Flush(); err != nil {
+		return fmt.Errorf("flush output: %w", err)
 	}
 	return nil
 }

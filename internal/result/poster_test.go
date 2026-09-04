@@ -2,6 +2,7 @@ package result
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,21 +16,33 @@ import (
 func TestPosterPostsCommentAndWritesArtifact(t *testing.T) {
 	got := ""
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		buf := make([]byte, 1024)
-		n, _ := r.Body.Read(buf)
-		got = string(buf[:n])
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read request body: %v", err)
+			return
+		}
+		got = string(body)
 		w.WriteHeader(http.StatusCreated)
 	}))
 	defer srv.Close()
 	c := gitlab.NewClient(srv.URL, "tok")
 
 	tmp := t.TempDir()
-	old, _ := os.Getwd()
-	os.Chdir(tmp)
-	defer os.Chdir(old)
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("change working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(old); err != nil {
+			t.Errorf("restore working directory: %v", err)
+		}
+	})
 
 	p := NewPoster(c, 123, 45, 0.85)
-	err := p.Post(context.Background(), "## hello\n", []string{"TestA", "TestB"}, true)
+	err = p.Post(context.Background(), "## hello\n", []string{"TestA", "TestB"}, true)
 	if err != nil {
 		t.Fatalf("post: %v", err)
 	}

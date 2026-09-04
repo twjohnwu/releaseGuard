@@ -17,7 +17,10 @@ func TestLookupResolves(t *testing.T) {
 }
 
 func TestLookupSkip(t *testing.T) {
-	l, _ := LoadFile(filepath.Join("..", "..", "..", "config", "diagram_aliases.yaml"))
+	l, err := LoadFile(filepath.Join("..", "..", "..", "config", "diagram_aliases.yaml"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
 	got, ok := l.Resolve("Postgres")
 	if ok {
 		t.Fatalf("expected skip for Postgres, got %q", got)
@@ -25,7 +28,10 @@ func TestLookupSkip(t *testing.T) {
 }
 
 func TestLookupUnknown(t *testing.T) {
-	l, _ := LoadFile(filepath.Join("..", "..", "..", "config", "diagram_aliases.yaml"))
+	l, err := LoadFile(filepath.Join("..", "..", "..", "config", "diagram_aliases.yaml"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
 	if _, ok := l.Resolve("Unknown"); ok {
 		t.Fatalf("expected unresolved")
 	}

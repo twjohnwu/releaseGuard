@@ -7,7 +7,10 @@ import (
 )
 
 func TestSubcommandsListed(t *testing.T) {
-	out, _ := exec.Command("go", "run", "./", "--help").CombinedOutput()
+	out, err := exec.Command("go", "run", "./", "--help").CombinedOutput()
+	if err != nil {
+		t.Fatalf("run help: %v\n%s", err, out)
+	}
 	s := string(out)
 	if !strings.Contains(s, "nightly") {
 		t.Fatalf("nightly not listed: %s", s)

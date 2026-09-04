@@ -64,10 +64,11 @@ func arbitrateInner(outputs []interfaces.AgentOutput) Recommendation {
 				continue
 			}
 			for _, f := range o.Findings {
-				if f.Severity == interfaces.SeverityCritical {
+				switch f.Severity {
+				case interfaces.SeverityCritical:
 					hold = append(hold, Signal{Agent: o.Agent, Kind: "critical_finding",
 						Detail: f.Title})
-				} else if f.Severity == interfaces.SeverityHigh {
+				case interfaces.SeverityHigh:
 					review = append(review, Signal{Agent: o.Agent, Kind: "high_finding",
 						Detail: f.Title})
 				}

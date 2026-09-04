@@ -202,7 +202,11 @@ func runAgentsParallel(ctx context.Context, log *logger.Logger, agentTimeout tim
 			// the process).
 			name := fmt.Sprintf("agent[%d]", i)
 			func() {
-				defer func() { recover() }()
+				defer func() {
+					if recover() != nil {
+						name = fmt.Sprintf("agent[%d]", i)
+					}
+				}()
 				name = string(a.Name())
 			}()
 

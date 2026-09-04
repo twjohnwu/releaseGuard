@@ -24,8 +24,15 @@ func TestStripModulePrefix(t *testing.T) {
 
 func TestDetectModule(t *testing.T) {
 	dir := t.TempDir()
-	old, _ := os.Getwd()
-	t.Cleanup(func() { _ = os.Chdir(old) })
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(old); err != nil {
+			t.Errorf("restore working directory: %v", err)
+		}
+	})
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +46,15 @@ func TestDetectModule(t *testing.T) {
 
 func TestDetectModuleMissing(t *testing.T) {
 	dir := t.TempDir()
-	old, _ := os.Getwd()
-	t.Cleanup(func() { _ = os.Chdir(old) })
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(old); err != nil {
+			t.Errorf("restore working directory: %v", err)
+		}
+	})
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}

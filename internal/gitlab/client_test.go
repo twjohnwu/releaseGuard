@@ -31,9 +31,11 @@ func TestGetMRDiff(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`[
+		if _, err := w.Write([]byte(`[
 			{"old_path":"foo.go","new_path":"foo.go","diff":"@@ -1,3 +1,3 @@\n-old\n+new","new_file":false,"renamed_file":false,"deleted_file":false}
-		]`))
+		]`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -53,10 +55,16 @@ func TestPostMRNote(t *testing.T) {
 		if r.Method != "POST" || r.URL.Path != "/projects/123/merge_requests/45/notes" {
 			t.Errorf("unexpected: %s %s", r.Method, r.URL.Path)
 		}
-		b, _ := io.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read request body: %v", err)
+			return
+		}
 		receivedBody = string(b)
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"id": 999}`))
+		if _, err := w.Write([]byte(`{"id": 999}`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer srv.Close()
 

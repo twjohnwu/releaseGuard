@@ -38,7 +38,10 @@ func TestAgentOutputSchemaVersionPinned(t *testing.T) {
 		DurationMs:    100,
 		SchemaVersion: "1",
 	}
-	raw, _ := json.Marshal(out)
+	raw, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
 	if !contains(raw, `"schema_version":"1"`) {
 		t.Fatalf("schema_version not v1: %s", raw)
 	}
