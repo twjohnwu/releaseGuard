@@ -1,5 +1,7 @@
 # deploy/ci/releaseguard.yaml
 .releaseguard-base:
+  # No publish job exists yet: build and push this image yourself
+  # (make docker && docker push ...) or replace the name with your registry.
   image: ghcr.io/twjohnwu/releaseguard-analyzer:latest
   variables:
     AI_PROVIDER: "anthropic"

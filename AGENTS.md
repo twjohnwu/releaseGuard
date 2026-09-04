@@ -32,6 +32,7 @@ go test ./... -count=1
 # T1 demo (no infra): three analyzers vs mock-gitlab → 3 MR comments
 cd deploy/compose && mkdir -p artifacts
 docker compose up --build --abort-on-container-exit
+# Per-agent budget: AGENT_TIMEOUT_SEC (default = ANALYZE_TIMEOUT_SEC; must be <= it)
 
 # T0 demo (Postgres + indexer): produces analysis_level=L3, confidence=0.90
 bash scripts/demo-t0.sh
@@ -106,7 +107,7 @@ mock-gitlab routes fixtures by `project_id`: `1=proceed`, `2=review`, `3=hold`, 
 - `docs/decisions_log.md` is the **design history** (narrative, "why we landed here").
 - The **code is the source of truth.** When they disagree, trust the code and update the docs.
 
-If you make a non-trivial design pivot, append a new entry to `decisions_log.md` (continue numbering past #17).
+If you make a non-trivial design pivot, append a new entry to `decisions_log.md` (continue numbering past #20).
 
 ## Doc language convention
 
