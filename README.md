@@ -133,6 +133,16 @@ The `feedback` subcommand then scans recent merged MRs, matches ReleaseGuard's o
 
 Output tallies HOLD count, false-positive-labeled HOLDs, and HOLD precision %. This is a Postgres-free MVP — the collected data is what the selective-test confidence constants (`internal/agents/testselect/confidence.go`) await for calibration.
 
+## Replay dataset
+
+`analyzer replay --dataset <dir>` runs the deterministic selective-test and rollout-risk agents (no AI or database) over recorded MR diffs stored as `<dir>/<case>/{diff.json,expected.json}`. It reports exact match, HOLD precision, and the false-positive rate.
+
+```bash
+go run ./cmd/analyzer replay --dataset testdata/replay --json
+```
+
+The seed dataset under `testdata/replay/` is copied from the mock-gitlab fixtures and is **not real MR data**; real anonymized MRs are a follow-up.
+
 ## Documentation
 
 - [`docs/case_study.md`](docs/case_study.md) — three MR-comment outcomes side by side, with analysis.

@@ -133,6 +133,16 @@ HOLD / REVIEW gate 可能誤判。為了量化這件事，每則 HOLD/REVIEW 的
 
 輸出統計 HOLD 次數、被標為誤報的 HOLD 數、以及 HOLD precision %。這是不需 Postgres 的 MVP——收集到的資料正是 selective-test 信心常數（`internal/agents/testselect/confidence.go`）等待校準的依據。
 
+## Replay 資料集
+
+`analyzer replay --dataset <dir>` 會對 `<dir>/<case>/{diff.json,expected.json}` 內記錄的 MR diff 執行 deterministic selective-test 與 rollout-risk agents（不使用 AI 或 DB），並回報 exact match、HOLD precision 與 false-positive rate。
+
+```bash
+go run ./cmd/analyzer replay --dataset testdata/replay --json
+```
+
+`testdata/replay/` 的 seed dataset 複製自 mock-gitlab fixtures，**不是真實 MR 資料**；真實且匿名化的 MR 將留待後續補上。
+
 ## 文件索引
 
 - [`docs/case_study.md`](docs/case_study.md) — 三段 MR comment 實況對比與分析

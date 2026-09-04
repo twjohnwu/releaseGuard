@@ -1,0 +1,42 @@
+[
+  {
+    "old_path": "internal/orders/handler.go",
+    "new_path": "internal/orders/handler.go",
+    "diff": "@@ -42,6 +42,9 @@ func (h *Handler) Create(ctx context.Context, req *CreateRequest) (*Response, error) {\n     if err := h.validate(req); err != nil {\n         return nil, err\n     }\n+    // NEW: skip discount_code validation when feature flag set\n+    if !h.flags.RequireDiscountCode {\n+        req.DiscountCode = \"\"\n+    }\n     return h.svc.CreateOrder(ctx, req)\n }",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  },
+  {
+    "old_path": "internal/orders/handler_test.go",
+    "new_path": "internal/orders/handler_test.go",
+    "diff": "@@ -10,6 +10,15 @@ func TestCreate(t *testing.T) {\n     // existing test...\n }\n+\n+func TestCreateSkipsDiscountCodeWhenFlagOff(t *testing.T) {\n+    h := newTestHandler(t)\n+    h.flags.RequireDiscountCode = false\n+    resp, err := h.Create(ctx, &CreateRequest{DiscountCode: \"X\"})\n+    if err != nil {\n+        t.Fatal(err)\n+    }\n+    _ = resp\n+}",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  },
+  {
+    "old_path": "config/feature_flags.yaml",
+    "new_path": "config/feature_flags.yaml",
+    "diff": "@@ -3,3 +3,4 @@\n flags:\n   require_discount_code: true\n+  use_new_pricing_engine: false\n",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  },
+  {
+    "old_path": "helm/values.yaml",
+    "new_path": "helm/values.yaml",
+    "diff": "@@ -10,2 +10,3 @@\n replicas: 3\n+pdbMinAvailable: 2\n",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  },
+  {
+    "old_path": "config/services.yaml",
+    "new_path": "config/services.yaml",
+    "diff": "@@ -5,2 +5,3 @@\n timeout: 30s\n+retries: 3\n",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  }
+]

@@ -24,6 +24,7 @@ jobs:
       - run: make build
       - run: go vet ./...
       - run: go test ./... -race -count=1
+      - run: go run ./cmd/analyzer replay --dataset testdata/replay --json
 
   lint:
     runs-on: ubuntu-latest

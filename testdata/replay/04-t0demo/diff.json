@@ -1,0 +1,18 @@
+[
+  {
+    "old_path": "internal/agents/rollout/agent.go",
+    "new_path": "internal/agents/rollout/agent.go",
+    "diff": "@@ -38,6 +38,9 @@ func (a *Agent) Run(ctx context.Context, in interfaces.AgentInput) (interfaces.AgentOutput, error) {\n     out := zonesToFindings(a.deps.Zones)\n+    // T0 demo: emit additional metric for medium-severity zones\n+    medCount := countMedium(a.deps.Zones)\n+    out.Metadata[\"medium_count\"] = medCount\n     return out, nil\n }",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  },
+  {
+    "old_path": "internal/report/arbitration.go",
+    "new_path": "internal/report/arbitration.go",
+    "diff": "@@ -22,6 +22,9 @@ func Arbitrate(outs []interfaces.AgentOutput) Recommendation {\n     // existing rules...\n+    // T0 demo: tighten threshold for med-zone escalation\n+    if len(outs) > 0 && outs[0].Status == interfaces.StatusFailed {\n+        return Recommendation{Level: \"REVIEW\"}\n+    }\n     return defaultRecommendation(outs)\n }",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false
+  }
+]
