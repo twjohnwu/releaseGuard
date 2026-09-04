@@ -79,9 +79,9 @@ jobs:
             if (( SECONDS >= deadline )); then
               echo "::error::Timed out after 540 seconds waiting for analyzer containers"
               for container in "${containers[@]}"; do
-                read -r status _ <<< "${container_states[$container]}"
+                read -r status _ <<< "${container_states[$container]:-}"
                 if [[ "$status" != "exited" ]]; then
-                  echo "$container: ${container_states[$container]}"
+                  echo "$container: ${container_states[$container]:-}"
                 fi
               done
               dump_logs_and_exit 1
@@ -110,7 +110,7 @@ jobs:
 
           containers_failed=false
           for container in "${containers[@]}"; do
-            read -r status exit_code <<< "${container_states[$container]}"
+            read -r status exit_code <<< "${container_states[$container]:-}"
             if [[ "$exit_code" != "0" ]]; then
               echo "::error::$container exited non-zero: $status $exit_code"
               containers_failed=true
