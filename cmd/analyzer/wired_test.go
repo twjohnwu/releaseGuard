@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acme/releaseguard/internal/agents/rollout"
-	"github.com/acme/releaseguard/internal/agents/testselect"
-	"github.com/acme/releaseguard/internal/config"
-	"github.com/acme/releaseguard/internal/interfaces"
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/agents/rollout"
+	"github.com/twjohnwu/releaseGuard/internal/agents/testselect"
+	"github.com/twjohnwu/releaseGuard/internal/config"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 func TestBuildAgentsRespectsFlags(t *testing.T) {

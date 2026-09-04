@@ -2,6 +2,8 @@
 
 **[English](./README.md) · [繁體中文](./README.zh-TW.md)**
 
+[![CI](https://img.shields.io/github/actions/workflow/status/twjohnwu/releaseGuard/ci.yml?branch=main&label=CI)](https://github.com/twjohnwu/releaseGuard/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/tag/twjohnwu/releaseGuard?label=release)](https://github.com/twjohnwu/releaseGuard/releases) ![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
+
 > MR 級別的 release 風險閘門：四個專責 agent 並行檢視 diff，由仲裁層收斂成單一 **HOLD / REVIEW / PROCEED** 建議，貼回 MR comment 最頂層。
 
 ## 為什麼需要這個系統
@@ -58,7 +60,7 @@ flowchart LR
 
 ## 實作狀態
 
-Plan A / B / C 均已完成（git tag `plan-a-foundation`、`plan-b-topology-1`、`plan-c-postgres-agents`）。AI Reviewer 的 RAG 相關部分仍停留在設計階段：
+Plan A / B / C 已完成（見 CHANGELOG.md）。Plan D（RAG）只有 spec，尚未實作。AI Reviewer 的 RAG 相關部分仍停留在設計階段：
 
 | 能力 | 狀態 |
 |---|---|

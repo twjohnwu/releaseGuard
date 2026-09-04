@@ -2,7 +2,7 @@
 // stream, attributing all hit functions to a single test name supplied via -tn.
 //
 // Usage:
-//   cover2lcov -tn=TestX -module=github.com/acme/releaseguard cover.out
+//   cover2lcov -tn=TestX -module=github.com/twjohnwu/releaseGuard cover.out
 //
 // Output (stdout):
 //   TN:TestX

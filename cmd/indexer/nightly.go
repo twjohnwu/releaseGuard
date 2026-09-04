@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 func init() {

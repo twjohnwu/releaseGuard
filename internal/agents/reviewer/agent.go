@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/acme/releaseguard/internal/ai"
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/ai"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 type Agent struct {

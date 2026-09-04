@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/acme/releaseguard/internal/interfaces"
-	"github.com/acme/releaseguard/internal/report"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/report"
 )
 
 func TestWriteReportWritesExpectedFields(t *testing.T) {

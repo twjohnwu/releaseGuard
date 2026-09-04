@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 func UpsertResult(ctx context.Context, pool *storage.Pool, repoID int64, r *BuildResult) error {

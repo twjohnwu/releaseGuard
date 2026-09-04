@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/acme/releaseguard/internal/ai"
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/ai"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 type stubProvider struct{ raw json.RawMessage }

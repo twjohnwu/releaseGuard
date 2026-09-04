@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/acme/releaseguard/internal/analysis/aliases"
-	"github.com/acme/releaseguard/internal/analysis/plantuml"
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/analysis/aliases"
+	"github.com/twjohnwu/releaseGuard/internal/analysis/plantuml"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 func stepPlantUML(ctx context.Context, pool *storage.Pool, repoID int64, repoPath string) error {

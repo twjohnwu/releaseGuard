@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 type Signal struct {

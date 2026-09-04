@@ -3,8 +3,8 @@ package result
 import (
 	"encoding/json"
 
-	"github.com/acme/releaseguard/internal/interfaces"
-	"github.com/acme/releaseguard/internal/report"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/report"
 )
 
 type Flags struct {

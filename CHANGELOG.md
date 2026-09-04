@@ -1,4 +1,4 @@
-## Plan A status: complete (commit efe202a, tag plan-a-foundation)
+## Plan A status: complete (pre-squash history; no tag)
 
 Foundation layer in place:
 - Shared interfaces (Finding / AgentOutput / IAgent)
@@ -13,7 +13,7 @@ Foundation layer in place:
 - GitLab CI template (.releaseguard-full + -lite)
 - e2e smoke test passing
 
-## Plan B status: complete (commit 82b7b9c, tag plan-b-topology-1)
+## Plan B status: complete (pre-squash history; no tag)
 
 Topology 1 demoable:
 - PlantUML parser + diagram_aliases.yaml + cross_repo_edges schema
@@ -25,7 +25,7 @@ Topology 1 demoable:
 - All agents wired in cmd/analyzer/main.go with parallel execution
 - e2e topology 1 smoke test passing
 
-## Plan C status: complete (commit 461b041, tag plan-c-postgres-agents)
+## Plan C status: complete (pre-squash history; no tag)
 
 Topology 0 (Postgres-backed) infrastructure:
 - 4 migrations: symbols + edges (callgraph), coverage_map, ownership_signals, mr_runs/agent_outputs/findings

@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/acme/releaseguard/internal/interfaces"
-	"github.com/acme/releaseguard/internal/report"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/report"
 )
 
 // Report is the machine-readable CI artifact written alongside the MR comment.

@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/acme/releaseguard/internal/indexer/code/coverage"
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/indexer/code/coverage"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 func stepCoverage(ctx context.Context, pool *storage.Pool, repoID int64, repoPath string) error {

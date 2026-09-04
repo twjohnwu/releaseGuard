@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 type ImpactScopeReport struct {

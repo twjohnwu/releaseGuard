@@ -8,7 +8,7 @@ ReleaseGuard is an MR-level release-gating system. Four specialised agents (Sele
 
 - **Language:** Go-only. No TypeScript / Python mirror — cross-language contracts live as neutral JSON Schema in `docs/spec/`.
 - **Topologies:** T0 (Postgres + indexer, full capability) and T1 (zero-infra script-only, degraded). Selected by the `TOPOLOGY` env var.
-- **Status:** Plans A / B / C complete (git tags `plan-a-foundation`, `plan-b-topology-1`, `plan-c-postgres-agents`). Plan D (RAG) has a written spec but is **not implemented**.
+- **Status:** Plans A / B / C complete (see CHANGELOG.md; git history was squashed at the first commit, so there are no per-plan tags). Plan D (RAG) has a written spec but is **not implemented**.
 
 ## Read first
 

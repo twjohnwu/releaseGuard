@@ -3,7 +3,7 @@ package report
 import (
 	"testing"
 
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 func TestFlattenSortsAndDedupes(t *testing.T) {

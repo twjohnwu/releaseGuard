@@ -3,7 +3,7 @@ package specdrift
 import (
 	"testing"
 
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 func TestDetectsHandlerChangedSpecUntouched(t *testing.T) {

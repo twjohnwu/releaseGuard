@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/acme/releaseguard/internal/indexer/code/cochange"
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/indexer/code/cochange"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 func stepCochange(ctx context.Context, pool *storage.Pool, repoID int64, repoPath string) error {

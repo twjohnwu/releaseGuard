@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 func TestOutputSchemaHasNoScoreField(t *testing.T) {

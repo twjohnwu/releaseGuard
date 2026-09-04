@@ -1,7 +1,7 @@
 package rollout
 
 import (
-	"github.com/acme/releaseguard/internal/analysis/schema"
+	"github.com/twjohnwu/releaseGuard/internal/analysis/schema"
 )
 
 func riskLevel(zones []schema.Zone) string {

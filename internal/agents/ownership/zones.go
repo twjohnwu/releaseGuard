@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 type Zone struct {

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/acme/releaseguard/internal/gitlab"
+	"github.com/twjohnwu/releaseGuard/internal/gitlab"
 )
 
 type Poster struct {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/acme/releaseguard/internal/analysis/schema"
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/analysis/schema"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 type Zone = schema.Zone

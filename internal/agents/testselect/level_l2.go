@@ -3,7 +3,7 @@ package testselect
 import (
 	"context"
 
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 func L2QueryRequired(ctx context.Context, pool *storage.Pool, repoID int64, files []string) ([]string, error) {

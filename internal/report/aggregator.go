@@ -3,7 +3,7 @@ package report
 import (
 	"sort"
 
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 var sevWeight = map[interfaces.Severity]int{

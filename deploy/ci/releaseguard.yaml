@@ -1,6 +1,6 @@
 # deploy/ci/releaseguard.yaml
 .releaseguard-base:
-  image: registry.example.com/releaseguard-analyzer:latest
+  image: ghcr.io/twjohnwu/releaseguard-analyzer:latest
   variables:
     AI_PROVIDER: "anthropic"
   script:

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/acme/releaseguard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
 )
 
 func TestRiskLevelHIGHWhenCriticalZone(t *testing.T) {

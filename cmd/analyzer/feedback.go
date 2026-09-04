@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/acme/releaseguard/internal/config"
-	"github.com/acme/releaseguard/internal/gitlab"
-	"github.com/acme/releaseguard/internal/report"
+	"github.com/twjohnwu/releaseGuard/internal/config"
+	"github.com/twjohnwu/releaseGuard/internal/gitlab"
+	"github.com/twjohnwu/releaseGuard/internal/report"
 )
 
 // decisionMarker is the stable substring the renderer emits in the MR comment

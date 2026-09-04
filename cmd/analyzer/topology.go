@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/acme/releaseguard/internal/config"
+	"github.com/twjohnwu/releaseGuard/internal/config"
 )
 
 // validateTopology returns "0" (full) or "1" (script-only) or error for invalid combinations.

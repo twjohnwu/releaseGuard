@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/acme/releaseguard/internal/config"
+	"github.com/twjohnwu/releaseGuard/internal/config"
 )
 
 func TestValidateTopologyTopology0(t *testing.T) {

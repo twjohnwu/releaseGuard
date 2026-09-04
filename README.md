@@ -2,6 +2,8 @@
 
 **[English](./README.md) · [繁體中文](./README.zh-TW.md)**
 
+[![CI](https://img.shields.io/github/actions/workflow/status/twjohnwu/releaseGuard/ci.yml?branch=main&label=CI)](https://github.com/twjohnwu/releaseGuard/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/tag/twjohnwu/releaseGuard?label=release)](https://github.com/twjohnwu/releaseGuard/releases) ![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
+
 > MR-level release gating: four specialised agents inspect the diff in parallel; an arbitration layer collapses their signals into a single **HOLD / REVIEW / PROCEED** recommendation that lands at the top of the MR comment.
 
 ## Why this exists
@@ -58,7 +60,7 @@ Full pipeline, T0/T1 topology comparison, and the arbitration decision matrix (t
 
 ## Implementation status
 
-Plans A / B / C are complete (git tags `plan-a-foundation`, `plan-b-topology-1`, `plan-c-postgres-agents`). The RAG-related pieces of the AI Reviewer remain design-only:
+Plans A / B / C are complete (see CHANGELOG.md). Plan D (RAG) has a written spec only and is not implemented. The RAG-related pieces of the AI Reviewer remain design-only:
 
 | Capability | Status |
 |---|---|

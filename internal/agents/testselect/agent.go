@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/acme/releaseguard/internal/interfaces"
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/interfaces"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 type Agent struct {

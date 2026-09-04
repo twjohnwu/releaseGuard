@@ -10,8 +10,8 @@ func TestStripModulePrefix(t *testing.T) {
 	cases := []struct {
 		in, mod, want string
 	}{
-		{"github.com/acme/releaseguard/internal/report/arbitration.go", "github.com/acme/releaseguard", "internal/report/arbitration.go"},
-		{"unrelated/path/file.go", "github.com/acme/releaseguard", "unrelated/path/file.go"},
+		{"github.com/twjohnwu/releaseGuard/internal/report/arbitration.go", "github.com/twjohnwu/releaseGuard", "internal/report/arbitration.go"},
+		{"unrelated/path/file.go", "github.com/twjohnwu/releaseGuard", "unrelated/path/file.go"},
 		{"some/file.go", "", "some/file.go"},
 	}
 	for _, c := range cases {

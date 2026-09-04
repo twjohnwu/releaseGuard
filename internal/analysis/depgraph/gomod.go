@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/acme/releaseguard/internal/analysis/schema"
+	"github.com/twjohnwu/releaseGuard/internal/analysis/schema"
 )
 
 // reuse schema.Zone type since it's the same shape

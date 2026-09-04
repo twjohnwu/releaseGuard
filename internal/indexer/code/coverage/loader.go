@@ -3,7 +3,7 @@ package coverage
 import (
 	"context"
 
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 // Load matches entries to existing symbols by (file, line range overlap) and inserts.

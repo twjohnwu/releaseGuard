@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acme/releaseguard/internal/storage"
+	"github.com/twjohnwu/releaseGuard/internal/storage"
 )
 
 func TestUpsertSymbolsAndEdgesIdempotent(t *testing.T) {

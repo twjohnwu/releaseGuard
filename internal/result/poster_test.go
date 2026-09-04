@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acme/releaseguard/internal/gitlab"
+	"github.com/twjohnwu/releaseGuard/internal/gitlab"
 )
 
 func TestPosterPostsCommentAndWritesArtifact(t *testing.T) {
