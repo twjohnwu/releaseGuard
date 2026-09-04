@@ -101,3 +101,22 @@ func TestArbitrationDetailIncludesZoneBreakdown(t *testing.T) {
 		t.Errorf("expected zone count in detail: %q", detail)
 	}
 }
+
+func TestArbitrate_PanicFailsClosedToReview(t *testing.T) {
+	old := arbitrateFn
+	arbitrateFn = func(outputs []interfaces.AgentOutput) Recommendation {
+		panic("boom")
+	}
+	t.Cleanup(func() { arbitrateFn = old })
+
+	rec := Arbitrate(nil)
+	if rec.Recommendation != "REVIEW" {
+		t.Fatalf("got %s want REVIEW", rec.Recommendation)
+	}
+	if !strings.Contains(rec.Rationale, "panicked") {
+		t.Fatalf("rationale missing 'panicked': %q", rec.Rationale)
+	}
+	if len(rec.TriggeredSignals) != 1 || rec.TriggeredSignals[0].Kind != "arbitration_panic" {
+		t.Fatalf("signals: %+v", rec.TriggeredSignals)
+	}
+}

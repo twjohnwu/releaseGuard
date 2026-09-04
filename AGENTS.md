@@ -77,6 +77,7 @@ mock-gitlab routes fixtures by `project_id`: `1=proceed`, `2=review`, `3=hold`, 
 | `SchemaVersion == "1"` | Cross-language contract stability |
 | `symbols.file` is repo-relative and non-empty | L3 lookup `WHERE file = ANY($)` depends on it |
 | `go test ./... -count=1` is green | Required before every commit |
+| Arbitration panic → REVIEW, never empty verdict | `TestArbitrate_PanicFailsClosedToReview` |
 
 ## Common task recipes
 

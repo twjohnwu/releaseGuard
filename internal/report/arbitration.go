@@ -30,14 +30,25 @@ type Recommendation struct {
 //   - Selective Test status=partial AND analysis_level != "L1" → REVIEW
 //   - any agent status=failed → at minimum REVIEW
 //   - Ownership signals do NOT trigger
-func Arbitrate(outputs []interfaces.AgentOutput) Recommendation {
+//   - arbitration panic → REVIEW (fail-closed)
+//
+// arbitrateFn is a package-level indirection so tests can inject a panicking
+// implementation to exercise the fail-closed recovery path below.
+var arbitrateFn = arbitrateInner
+
+func Arbitrate(outputs []interfaces.AgentOutput) (rec Recommendation) {
 	defer func() {
-		// defensive: any panic during arbitration shouldn't drop the whole report
 		if r := recover(); r != nil {
-			// fallback handled in wrapper below
+			rec = Recommendation{
+				Recommendation: "REVIEW",
+				Rationale:      fmt.Sprintf("arbitration panicked: %v", r),
+				TriggeredSignals: []Signal{
+					{Kind: "arbitration_panic", Detail: fmt.Sprint(r)},
+				},
+			}
 		}
 	}()
-	return arbitrateInner(outputs)
+	return arbitrateFn(outputs)
 }
 
 func arbitrateInner(outputs []interfaces.AgentOutput) Recommendation {

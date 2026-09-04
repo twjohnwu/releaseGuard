@@ -105,13 +105,13 @@ func TestParseServiceTypes(t *testing.T) {
 
 func TestLoadConfigPipelineVars(t *testing.T) {
 	withEnv(map[string]string{
-		"AI_PROVIDER_KEY":         "key",
-		"GITLAB_TOKEN":            "tok",
-		"RG_SERVICE_NAME":     "checkout-svc",
-		"RG_SERVICE_TYPE":     "backend, worker",
-		"CI_COMMIT_SHA":           "abc123",
-		"CI_PROJECT_ID":           "42",
-		"CI_MERGE_REQUEST_IID":    "7",
+		"AI_PROVIDER_KEY":      "key",
+		"GITLAB_TOKEN":         "tok",
+		"RG_SERVICE_NAME":      "checkout-svc",
+		"RG_SERVICE_TYPE":      "backend, worker",
+		"CI_COMMIT_SHA":        "abc123",
+		"CI_PROJECT_ID":        "42",
+		"CI_MERGE_REQUEST_IID": "7",
 	}, func() {
 		c, err := Load()
 		if err != nil {
@@ -131,6 +131,35 @@ func TestLoadConfigPipelineVars(t *testing.T) {
 		}
 		if c.CIMergeRequestIID != 7 {
 			t.Errorf("CIMergeRequestIID=%d", c.CIMergeRequestIID)
+		}
+	})
+}
+
+func TestLoadConfigAgentTimeoutDefault(t *testing.T) {
+	withEnv(map[string]string{
+		"AI_PROVIDER_KEY": "key",
+		"GITLAB_TOKEN":    "tok",
+	}, func() {
+		c, err := Load()
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		if c.AgentTimeoutSec != 60 {
+			t.Fatalf("AgentTimeoutSec default wrong: %d", c.AgentTimeoutSec)
+		}
+	})
+}
+
+func TestLoadConfigAgentTimeoutRejectsGEAnalyzeTimeout(t *testing.T) {
+	withEnv(map[string]string{
+		"AI_PROVIDER_KEY":          "key",
+		"GITLAB_TOKEN":             "tok",
+		"ANALYZE_TIMEOUT_SEC":      "60",
+		"RG_AGENT_TIMEOUT_SECONDS": "60",
+	}, func() {
+		_, err := Load()
+		if err == nil {
+			t.Fatalf("expected error when AgentTimeoutSec >= AnalyzeTimeoutSec")
 		}
 	})
 }

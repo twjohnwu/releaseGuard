@@ -106,7 +106,8 @@ func run() error {
 		repoID:       repoID,
 	})
 
-	outs := runAgentsParallel(ctx, agents, in)
+	agentTimeout := time.Duration(cfg.AgentTimeoutSec) * time.Second
+	outs := runAgentsParallel(ctx, log, agentTimeout, agents, in)
 
 	flags := result.Flags{
 		SelectiveTest: cfg.Agents.SelectiveTest,
@@ -178,20 +179,46 @@ func buildAgents(flags config.AgentFlags, deps buildAgentsDeps) []interfaces.IAg
 	return agents
 }
 
-func runAgentsParallel(ctx context.Context, agents []interfaces.IAgent, in interfaces.AgentInput) []interfaces.AgentOutput {
+// runAgentsParallel fans out each agent into its own goroutine with an
+// independent context.WithTimeout (bounded by agentTimeout), so one slow or
+// panicking agent cannot exhaust the shared analyze budget or crash the
+// process. Every outcome is logged with its duration.
+func runAgentsParallel(ctx context.Context, log *logger.Logger, agentTimeout time.Duration,
+	agents []interfaces.IAgent, in interfaces.AgentInput) []interfaces.AgentOutput {
 	var wg sync.WaitGroup
 	out := make([]interfaces.AgentOutput, len(agents))
 	for i, a := range agents {
 		wg.Add(1)
 		go func(i int, a interfaces.IAgent) {
 			defer wg.Done()
-			o, err := a.Run(ctx, in)
+			start := time.Now()
+			actx, cancel := context.WithTimeout(ctx, agentTimeout)
+			defer cancel()
+
+			defer func() {
+				if r := recover(); r != nil {
+					out[i] = interfaces.AgentOutput{Agent: a.Name(), Status: interfaces.StatusFailed,
+						SchemaVersion: "1", Summary: fmt.Sprintf("panic: %v", r),
+						DurationMs: int(time.Since(start).Milliseconds())}
+					log.Error("agent panicked", "agent", a.Name(), "err", r)
+				}
+			}()
+
+			o, err := a.Run(actx, in)
 			if err != nil {
+				summary := err.Error()
+				if actx.Err() == context.DeadlineExceeded {
+					summary = fmt.Sprintf("timeout after %s", agentTimeout)
+				}
 				out[i] = interfaces.AgentOutput{Agent: a.Name(), Status: interfaces.StatusFailed,
-					SchemaVersion: "1", Summary: err.Error()}
-				return
+					SchemaVersion: "1", Summary: summary, DurationMs: int(time.Since(start).Milliseconds())}
+			} else {
+				if o.DurationMs == 0 {
+					o.DurationMs = int(time.Since(start).Milliseconds())
+				}
+				out[i] = o
 			}
-			out[i] = o
+			log.Info("agent done", "agent", a.Name(), "status", out[i].Status, "duration_ms", out[i].DurationMs)
 		}(i, a)
 	}
 	wg.Wait()
