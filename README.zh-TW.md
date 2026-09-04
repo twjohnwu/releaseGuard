@@ -104,6 +104,8 @@ releaseguard-review:
     RG_SERVICE_TYPE: backend
 ```
 
+設定 `AGENT_TIMEOUT_SEC` 可單獨限制每個 agent 的時間；預設等於 `ANALYZE_TIMEOUT_SEC`，且不得超過它。取消是透過 `context` 合作式進行，agent 內部卡住的 syscall（例如 `PROJECTS_DIR` 底下掛載停擺）不會被中斷。
+
 ## 成本
 
 只有 AI Reviewer 會呼叫付費 LLM API，其餘三個 agent 都是純 Go。每個 MR reviewer 大致送出：

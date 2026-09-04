@@ -259,7 +259,7 @@
 
 **為什麼錯**：Go 的非具名回傳在 panic 後只會回零值。結果是 recover 確實吞掉了 panic，但呼叫端拿到 `Recommendation{}`：recommendation 是空字串、沒有 rationale、沒有 signal。MR comment 會貼出一個沒有結論的 gate 結果，比直接 crash 更糟——crash 至少會被 CI 標紅，空 verdict 看起來像「沒事」。這條路徑也沒有任何測試覆蓋，所以兩年內都不會有人發現。
 
-**現在做法**：改為具名回傳 `(rec Recommendation)`，recover 時明確設成 `REVIEW`，rationale 寫 `arbitration panicked: <原因>`，並附一個 `arbitration_panic` signal。選 REVIEW 而非 HOLD：系統自身故障不該封鎖合併（那是把工具的 bug 轉嫁成團隊的阻塞），但必須有人看一眼。仲裁邏輯抽成可注入的 `arbitrateFn` 供測試灌 panic；`TestArbitrate_PanicFailsClosedToReview` 先紅後綠，並列入 AGENTS.md 的 invariants 表。同一輪也把 `runAgentsParallel` 的四個 goroutine 各自加上 recover、per-agent timeout（`AGENT_TIMEOUT_SEC`，未設時等於 `ANALYZE_TIMEOUT_SEC`）與一行 `agent done` log，讓單一 agent 的 panic 或卡死不再拖垮整個 analyzer。
+**現在做法**：改為具名回傳 `(rec Recommendation)`，recover 時明確設成 `REVIEW`，rationale 寫 `arbitration panicked: <原因>`，並附一個 `arbitration_panic` signal。選 REVIEW 而非 HOLD：系統自身故障不該封鎖合併（那是把工具的 bug 轉嫁成團隊的阻塞），但必須有人看一眼。仲裁邏輯抽成可注入的 `arbitrateFn` 供測試灌 panic；`TestArbitrate_PanicFailsClosedToReview` 先紅後綠，並列入 AGENTS.md 的 invariants 表。同一輪也把 `runAgentsParallel` 的四個 goroutine 各自加上 recover、per-agent timeout（`AGENT_TIMEOUT_SEC`，未設時等於 `ANALYZE_TIMEOUT_SEC`）與一行 `agent done` log，讓單一 agent 的 panic 或超時不再拖垮整個 analyzer（取消是 context 合作式的，卡在 syscall 裡的 agent 仍會等到它自己返回）。
 
 **學到什麼**：**recover 不是 fallback，recover 之後「回傳什麼」才是 fallback**。防禦性程式碼如果沒有明確定義失敗時的輸出，它只是把失敗藏起來。判斷 fail-closed 該落在哪一級時，問的不是「最安全的是什麼」而是「這個失敗是誰的責任」：工具自己壞了，代價該由工具承擔（要求人看），不該由使用者承擔（封鎖合併）。
 

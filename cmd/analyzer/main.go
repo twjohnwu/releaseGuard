@@ -187,9 +187,10 @@ func buildAgents(flags config.AgentFlags, deps buildAgentsDeps) []interfaces.IAg
 }
 
 // runAgentsParallel fans out each agent into its own goroutine with an
-// independent context.WithTimeout (bounded by agentTimeout), so one slow or
-// panicking agent cannot exhaust the shared analyze budget or crash the
-// process. Every outcome is logged with its duration.
+// independent context.WithTimeout (bounded by agentTimeout). Cancellation is
+// cooperative: an agent honouring ctx cannot exhaust the shared analyze
+// budget, but a blocking syscall inside it is not interrupted. Every outcome
+// is logged with its duration.
 func runAgentsParallel(ctx context.Context, log *logger.Logger, agentTimeout time.Duration,
 	agents []interfaces.IAgent, in interfaces.AgentInput) []interfaces.AgentOutput {
 	var wg sync.WaitGroup

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -21,7 +22,7 @@ func TestE2ETopology1FullFlow(t *testing.T) {
 		}
 	})
 
-	posted := false
+	var posted atomic.Bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/diffs"):
@@ -29,7 +30,7 @@ func TestE2ETopology1FullFlow(t *testing.T) {
 				t.Errorf("write diffs response: %v", err)
 			}
 		case strings.HasSuffix(r.URL.Path, "/notes"):
-			posted = true
+			posted.Store(true)
 			w.WriteHeader(201)
 			if _, err := w.Write([]byte(`{"id":1}`)); err != nil {
 				t.Errorf("write notes response: %v", err)
@@ -57,7 +58,7 @@ func TestE2ETopology1FullFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run: %s", gotOut)
 	}
-	if !posted {
+	if !posted.Load() {
 		t.Fatalf("MR comment not posted; output=%s", gotOut)
 	}
 }

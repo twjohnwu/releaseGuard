@@ -104,6 +104,8 @@ releaseguard-review:
     RG_SERVICE_TYPE: backend
 ```
 
+Set `AGENT_TIMEOUT_SEC` to cap each agent independently; it defaults to `ANALYZE_TIMEOUT_SEC` and must not exceed it. Agents are cancelled cooperatively through `context`, so a blocking syscall inside an agent (for example a stalled network mount under `PROJECTS_DIR`) is not interrupted.
+
 ## Cost
 
 The AI Reviewer is the only component that calls a paid LLM API; the other three agents are pure Go. Per MR, the reviewer sends roughly:
