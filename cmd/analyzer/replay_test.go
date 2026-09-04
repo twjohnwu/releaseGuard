@@ -17,6 +17,12 @@ func TestRunReplayCases(t *testing.T) {
 	if metrics.Cases != 4 {
 		t.Fatalf("Cases = %d, want 4", metrics.Cases)
 	}
+	if metrics.HoldPrecisionPct == nil {
+		t.Fatal("HoldPrecisionPct is nil, want 100")
+	}
+	if *metrics.HoldPrecisionPct != 100 {
+		t.Fatalf("HoldPrecisionPct = %v, want 100", *metrics.HoldPrecisionPct)
+	}
 
 	byName := make(map[string]replayCaseResult, len(metrics.PerCase))
 	for _, result := range metrics.PerCase {

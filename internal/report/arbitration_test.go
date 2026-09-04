@@ -102,6 +102,28 @@ func TestArbitrationDetailIncludesZoneBreakdown(t *testing.T) {
 	}
 }
 
+func TestArbitrate_UnknownFailedAgentTriggersReview(t *testing.T) {
+	t.Run("failed", func(t *testing.T) {
+		rec := Arbitrate([]interfaces.AgentOutput{{Agent: "agent[0]", Status: interfaces.StatusFailed}})
+		if rec.Recommendation != "REVIEW" {
+			t.Fatalf("got %s want REVIEW", rec.Recommendation)
+		}
+		if len(rec.TriggeredSignals) != 1 || rec.TriggeredSignals[0].Kind != "agent_failure" {
+			t.Fatalf("signals: %+v", rec.TriggeredSignals)
+		}
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		rec := Arbitrate([]interfaces.AgentOutput{{Agent: "agent[0]", Status: interfaces.StatusOK}})
+		if rec.Recommendation != "PROCEED" {
+			t.Fatalf("got %s want PROCEED", rec.Recommendation)
+		}
+		if len(rec.TriggeredSignals) != 0 {
+			t.Fatalf("signals: %+v", rec.TriggeredSignals)
+		}
+	})
+}
+
 func TestArbitrate_PanicFailsClosedToReview(t *testing.T) {
 	old := arbitrateFn
 	arbitrateFn = func(outputs []interfaces.AgentOutput) Recommendation {

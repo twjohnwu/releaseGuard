@@ -111,6 +111,11 @@ func arbitrateInner(outputs []interfaces.AgentOutput) Recommendation {
 				review = append(review, Signal{Agent: o.Agent, Kind: "agent_failure",
 					Detail: "Ownership failed"})
 			}
+		default:
+			if o.Status == interfaces.StatusFailed {
+				review = append(review, Signal{Agent: o.Agent, Kind: "agent_failure",
+					Detail: string(o.Agent) + " failed"})
+			}
 		}
 	}
 

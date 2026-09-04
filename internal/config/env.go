@@ -116,20 +116,24 @@ func reportPathEnv() string {
 	return v
 }
 
-func agentTimeoutEnv(analyzeTimeoutSec int) int {
+func agentTimeoutEnv(analyzeTimeoutSec int) (int, error) {
 	v, ok := os.LookupEnv("AGENT_TIMEOUT_SEC")
 	if !ok || v == "" {
-		return analyzeTimeoutSec
+		return analyzeTimeoutSec, nil
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil {
-		return 0
+		return 0, fmt.Errorf("AGENT_TIMEOUT_SEC: invalid integer %q: %w", v, err)
 	}
-	return n
+	return n, nil
 }
 
 func Load() (*Config, error) {
 	analyzeTimeoutSec := intEnv("ANALYZE_TIMEOUT_SEC", 180)
+	agentTimeoutSec, err := agentTimeoutEnv(analyzeTimeoutSec)
+	if err != nil {
+		return nil, err
+	}
 	c := &Config{
 		Agents: AgentFlags{
 			SelectiveTest: boolEnv("RG_AGENT_SELECTIVE_TEST_ENABLED", true),
@@ -146,7 +150,7 @@ func Load() (*Config, error) {
 		GitLabAPIBase:              strEnv("GITLAB_API_BASE", "https://gitlab.com/api/v4"),
 		ProjectsDir:                strEnv("PROJECTS_DIR", "/app/projects"),
 		AnalyzeTimeoutSec:          analyzeTimeoutSec,
-		AgentTimeoutSec:            agentTimeoutEnv(analyzeTimeoutSec),
+		AgentTimeoutSec:            agentTimeoutSec,
 		OwnershipLookbackDays:      intEnv("OWNERSHIP_LOOKBACK_DAYS", 180),
 		SelectiveTestMinConfidence: floatEnv("SELECTIVE_TEST_MIN_CONFIDENCE", 0.85),
 		PromptMaxTokens:            intEnv("PROMPT_MAX_TOKENS", 8000),

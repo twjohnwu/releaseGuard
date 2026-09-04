@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +29,11 @@ func stepPlantUML(ctx context.Context, pool *storage.Pool, repoID int64, repoPat
 	var puml []string
 	if err := filepath.Walk(repoPath, func(p string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
-			return walkErr
+			log.Printf("walk PlantUML path %q: %v", p, walkErr)
+			if info != nil && info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if info != nil && !info.IsDir() &&
 			(strings.HasSuffix(p, ".puml") || strings.HasSuffix(p, ".plantuml")) {
@@ -37,6 +43,8 @@ func stepPlantUML(ctx context.Context, pool *storage.Pool, repoID int64, repoPat
 	}); err != nil {
 		return err
 	}
+	insertAttempts := 0
+	insertFailures := 0
 	for _, p := range puml {
 		f, err := os.Open(p)
 		if err != nil {
@@ -60,13 +68,18 @@ func stepPlantUML(ctx context.Context, pool *storage.Pool, repoID int64, repoPat
 			if dstOK {
 				dstID = lookupRepoID(ctx, pool, dstRepo)
 			}
+			insertAttempts++
 			if _, err := pool.Exec(ctx, `
 				INSERT INTO cross_repo_edges(source_repo_id, target_repo_id, source_alias, target_alias, call_kind, source_diagram_path)
 				VALUES($1,$2,$3,$4,$5,$6)`,
 				srcID, dstID, in.Source, in.Target, in.Kind, p); err != nil {
-				return err
+				insertFailures++
+				log.Printf("insert cross_repo_edges interaction from %q to %q in %q: %v", in.Source, in.Target, p, err)
 			}
 		}
+	}
+	if insertAttempts > 0 && insertFailures == insertAttempts {
+		return fmt.Errorf("all %d cross_repo_edges insert attempts failed", insertAttempts)
 	}
 	return nil
 }

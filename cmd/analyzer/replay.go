@@ -29,8 +29,8 @@ type replayMetrics struct {
 	Cases            int                `json:"cases"`
 	ExactMatch       int                `json:"exact_match"`
 	ExactMatchPct    float64            `json:"exact_match_pct"`
-	HoldPrecisionPct any                `json:"hold_precision_pct"`
-	FalsePositivePct any                `json:"false_positive_pct"`
+	HoldPrecisionPct *float64           `json:"hold_precision_pct"`
+	FalsePositivePct *float64           `json:"false_positive_pct"`
 	PerCase          []replayCaseResult `json:"per_case"`
 }
 
@@ -78,10 +78,8 @@ func runReplayCases(dataset string, agentTimeoutSec int) (replayMetrics, error) 
 	sort.Strings(caseNames)
 
 	metrics := replayMetrics{
-		Cases:            len(caseNames),
-		HoldPrecisionPct: "n/a",
-		FalsePositivePct: "n/a",
-		PerCase:          make([]replayCaseResult, 0, len(caseNames)),
+		Cases:   len(caseNames),
+		PerCase: make([]replayCaseResult, 0, len(caseNames)),
 	}
 	predictedHolds := 0
 	correctHolds := 0
@@ -155,10 +153,12 @@ func runReplayCases(dataset string, agentTimeoutSec int) (replayMetrics, error) 
 		metrics.ExactMatchPct = 100 * float64(metrics.ExactMatch) / float64(metrics.Cases)
 	}
 	if predictedHolds > 0 {
-		metrics.HoldPrecisionPct = 100 * float64(correctHolds) / float64(predictedHolds)
+		v := 100 * float64(correctHolds) / float64(predictedHolds)
+		metrics.HoldPrecisionPct = &v
 	}
 	if expectedProceeds > 0 {
-		metrics.FalsePositivePct = 100 * float64(falsePositives) / float64(expectedProceeds)
+		v := 100 * float64(falsePositives) / float64(expectedProceeds)
+		metrics.FalsePositivePct = &v
 	}
 	return metrics, nil
 }
@@ -198,9 +198,9 @@ func printReplayTable(metrics replayMetrics) {
 	fmt.Printf("false-positive rate: %s\n", replayPct(metrics.FalsePositivePct))
 }
 
-func replayPct(value any) string {
-	if pct, ok := value.(float64); ok {
-		return fmt.Sprintf("%.1f%%", pct)
+func replayPct(value *float64) string {
+	if value == nil {
+		return "n/a"
 	}
-	return fmt.Sprint(value)
+	return fmt.Sprintf("%.1f%%", *value)
 }

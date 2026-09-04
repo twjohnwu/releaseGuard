@@ -202,3 +202,16 @@ func TestLoadConfigAgentTimeoutRejectsZero(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadConfigAgentTimeoutRejectsInvalidInteger(t *testing.T) {
+	withEnv(t, map[string]string{
+		"AI_PROVIDER_KEY":   "key",
+		"GITLAB_TOKEN":      "tok",
+		"AGENT_TIMEOUT_SEC": "abc",
+	}, func() {
+		_, err := Load()
+		if err == nil || !strings.Contains(err.Error(), "invalid integer") {
+			t.Fatalf("expected invalid integer error, got: %v", err)
+		}
+	})
+}
