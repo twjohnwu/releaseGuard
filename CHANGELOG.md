@@ -1,3 +1,23 @@
+## [0.1.0] - 2026-09-04
+
+First tagged release. Closes the productize round driven by an external review.
+
+Added:
+- GitHub Actions CI: `go test -race`, `go vet`, `make build`; golangci-lint v2; docker smoke of the T1 compose demo asserting HOLD / REVIEW / PROCEED
+- `analyzer replay --dataset <dir>`: precision / false-positive measurement over recorded MR diffs; seed dataset `testdata/replay/` from the mock-gitlab fixtures
+- Per-agent timeout `AGENT_TIMEOUT_SEC` (defaults to `ANALYZE_TIMEOUT_SEC`), per-goroutine panic recovery, one `agent done` log line per agent
+- README badges (CI, release, Go) and replay docs
+
+Changed:
+- Module path `github.com/acme/releaseguard` → `github.com/twjohnwu/releaseGuard`
+- Deploy manifest image → `ghcr.io/twjohnwu/releaseguard-analyzer`
+- All golangci-lint v2 findings resolved (errcheck / staticcheck / ineffassign); error paths now propagate or log instead of being ignored
+
+Fixed:
+- `Arbitrate` returned an empty Recommendation after a recovered panic; now fails closed to REVIEW with an `arbitration_panic` signal (decisions_log #19)
+- A panicking or hung agent could crash or stall the whole analyzer
+- README / AGENTS.md / CHANGELOG referenced git tags that never existed
+
 ## Plan A status: complete (pre-squash history; no tag)
 
 Foundation layer in place:

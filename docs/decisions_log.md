@@ -253,9 +253,33 @@
 
 ---
 
+## 19. 仲裁 panic 時 fail-closed 到 REVIEW，不回傳空 verdict
+
+**最初想法**：`Arbitrate()` 用 `defer recover()` 包住仲裁邏輯，想法是「仲裁層任何 panic 都不該讓整份報告消失」。recover 的 body 是空的，註解寫著 fallback 在 wrapper 處理——但 wrapper 從來沒寫。
+
+**為什麼錯**：Go 的非具名回傳在 panic 後只會回零值。結果是 recover 確實吞掉了 panic，但呼叫端拿到 `Recommendation{}`：recommendation 是空字串、沒有 rationale、沒有 signal。MR comment 會貼出一個沒有結論的 gate 結果，比直接 crash 更糟——crash 至少會被 CI 標紅，空 verdict 看起來像「沒事」。這條路徑也沒有任何測試覆蓋，所以兩年內都不會有人發現。
+
+**現在做法**：改為具名回傳 `(rec Recommendation)`，recover 時明確設成 `REVIEW`，rationale 寫 `arbitration panicked: <原因>`，並附一個 `arbitration_panic` signal。選 REVIEW 而非 HOLD：系統自身故障不該封鎖合併（那是把工具的 bug 轉嫁成團隊的阻塞），但必須有人看一眼。仲裁邏輯抽成可注入的 `arbitrateFn` 供測試灌 panic；`TestArbitrate_PanicFailsClosedToReview` 先紅後綠，並列入 AGENTS.md 的 invariants 表。同一輪也把 `runAgentsParallel` 的四個 goroutine 各自加上 recover、per-agent timeout（`AGENT_TIMEOUT_SEC`，未設時等於 `ANALYZE_TIMEOUT_SEC`）與一行 `agent done` log，讓單一 agent 的 panic 或卡死不再拖垮整個 analyzer。
+
+**學到什麼**：**recover 不是 fallback，recover 之後「回傳什麼」才是 fallback**。防禦性程式碼如果沒有明確定義失敗時的輸出，它只是把失敗藏起來。判斷 fail-closed 該落在哪一級時，問的不是「最安全的是什麼」而是「這個失敗是誰的責任」：工具自己壞了，代價該由工具承擔（要求人看），不該由使用者承擔（封鎖合併）。
+
+---
+
+## 20. Replay dataset 先用 mock fixture 起步，明標「觀察基線」
+
+**最初想法**：外部 review 要求建立匿名 MR replay dataset 來量測 precision 與誤報率。直覺是先去收真實 MR、做匿名化、人工標註，把 dataset 做完整再寫量測工具。
+
+**為什麼錯**：真實匿名 MR 目前一筆都沒有，收集與標註是以週計的工作，而且需要一個真的在用 ReleaseGuard 的團隊。若量測管道要等資料齊全才存在，precision 這個指標會一直停在「計畫中」。跟 #18 同一個教訓的另一面：#18 說瓶頸在訊號取得，這裡則是「管道不存在，訊號來了也沒地方放」。
+
+**現在做法**：先寫 `analyzer replay --dataset <dir>`：每個 case 一個資料夾，`diff.json` 沿用 mock-gitlab 的 GitLab MR changes 格式，`expected.json` 標預期 verdict。只跑 deterministic agents（Selective Test L1、Rollout Risk），輸出 exact-match、HOLD precision、false-positive rate，`--json` 可機讀。種子資料就是 mock-gitlab 的四個 fixture（`testdata/replay/`），CI 每次 push 都跑一遍。其中 `04-t0demo` 的 expected 是 deterministic 路徑跑出來的**觀察基線**（PROCEED），不是 ground truth，README 明說。
+
+**學到什麼**：**先讓量測管道存在，再逐步換上真資料**。用 mock 資料起步不是造假，只要每個 case 都誠實標明來源與可信度；真正的風險是把「觀察到的輸出」寫成「預期」卻不註明，那會讓 regression test 變成把現狀鎖死的儀式。資料集的價值在於它能被替換，不在於第一版有多真。
+
+---
+
 ## 跨決策的觀察
 
-回頭看這 18 個決策，可以歸納出幾個**反覆出現的設計判斷模式**：
+回頭看這 20 個決策，可以歸納出幾個**反覆出現的設計判斷模式**：
 
 ### 模式 A：collapse 在正確的層級
 - Decision #5（recommendation 層 collapse）
