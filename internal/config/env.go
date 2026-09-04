@@ -116,7 +116,17 @@ func reportPathEnv() string {
 	return v
 }
 
+func agentTimeoutEnv(analyzeTimeoutSec int) int {
+	v, ok := os.LookupEnv("AGENT_TIMEOUT_SEC")
+	if !ok || v == "" {
+		return analyzeTimeoutSec
+	}
+	n, _ := strconv.Atoi(v)
+	return n
+}
+
 func Load() (*Config, error) {
+	analyzeTimeoutSec := intEnv("ANALYZE_TIMEOUT_SEC", 180)
 	c := &Config{
 		Agents: AgentFlags{
 			SelectiveTest: boolEnv("RG_AGENT_SELECTIVE_TEST_ENABLED", true),
@@ -132,8 +142,8 @@ func Load() (*Config, error) {
 		GitLabToken:                os.Getenv("GITLAB_TOKEN"),
 		GitLabAPIBase:              strEnv("GITLAB_API_BASE", "https://gitlab.com/api/v4"),
 		ProjectsDir:                strEnv("PROJECTS_DIR", "/app/projects"),
-		AnalyzeTimeoutSec:          intEnv("ANALYZE_TIMEOUT_SEC", 180),
-		AgentTimeoutSec:            intEnv("AGENT_TIMEOUT_SEC", 60),
+		AnalyzeTimeoutSec:          analyzeTimeoutSec,
+		AgentTimeoutSec:            agentTimeoutEnv(analyzeTimeoutSec),
 		OwnershipLookbackDays:      intEnv("OWNERSHIP_LOOKBACK_DAYS", 180),
 		SelectiveTestMinConfidence: floatEnv("SELECTIVE_TEST_MIN_CONFIDENCE", 0.85),
 		PromptMaxTokens:            intEnv("PROMPT_MAX_TOKENS", 8000),
@@ -155,8 +165,8 @@ func Load() (*Config, error) {
 	if c.GitLabToken == "" {
 		return nil, fmt.Errorf("GITLAB_TOKEN required")
 	}
-	if c.AgentTimeoutSec <= 0 || c.AgentTimeoutSec >= c.AnalyzeTimeoutSec {
-		return nil, fmt.Errorf("AGENT_TIMEOUT_SEC (%d) must be > 0 and < ANALYZE_TIMEOUT_SEC (%d)",
+	if c.AgentTimeoutSec <= 0 || c.AgentTimeoutSec > c.AnalyzeTimeoutSec {
+		return nil, fmt.Errorf("AGENT_TIMEOUT_SEC (%d) must be > 0 and <= ANALYZE_TIMEOUT_SEC (%d)",
 			c.AgentTimeoutSec, c.AnalyzeTimeoutSec)
 	}
 	return c, nil

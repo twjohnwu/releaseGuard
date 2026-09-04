@@ -138,29 +138,47 @@ func TestLoadConfigPipelineVars(t *testing.T) {
 
 func TestLoadConfigAgentTimeoutDefault(t *testing.T) {
 	withEnv(map[string]string{
-		"AI_PROVIDER_KEY": "key",
-		"GITLAB_TOKEN":    "tok",
+		"AI_PROVIDER_KEY":     "key",
+		"GITLAB_TOKEN":        "tok",
+		"ANALYZE_TIMEOUT_SEC": "45",
 	}, func() {
 		c, err := Load()
 		if err != nil {
 			t.Fatalf("load: %v", err)
 		}
-		if c.AgentTimeoutSec != 60 {
-			t.Fatalf("AgentTimeoutSec default wrong: %d", c.AgentTimeoutSec)
+		if c.AgentTimeoutSec != c.AnalyzeTimeoutSec {
+			t.Fatalf("AgentTimeoutSec default should follow AnalyzeTimeoutSec: got %d, want %d", c.AgentTimeoutSec, c.AnalyzeTimeoutSec)
 		}
 	})
 }
 
-func TestLoadConfigAgentTimeoutRejectsGEAnalyzeTimeout(t *testing.T) {
+func TestLoadConfigAgentTimeoutRejectsGTAnalyzeTimeout(t *testing.T) {
+	withEnv(map[string]string{
+		"AI_PROVIDER_KEY":     "key",
+		"GITLAB_TOKEN":        "tok",
+		"ANALYZE_TIMEOUT_SEC": "60",
+		"AGENT_TIMEOUT_SEC":   "61",
+	}, func() {
+		_, err := Load()
+		if err == nil {
+			t.Fatalf("expected error when AgentTimeoutSec > AnalyzeTimeoutSec")
+		}
+	})
+}
+
+func TestLoadConfigAgentTimeoutAcceptsEqualAnalyzeTimeout(t *testing.T) {
 	withEnv(map[string]string{
 		"AI_PROVIDER_KEY":     "key",
 		"GITLAB_TOKEN":        "tok",
 		"ANALYZE_TIMEOUT_SEC": "60",
 		"AGENT_TIMEOUT_SEC":   "60",
 	}, func() {
-		_, err := Load()
-		if err == nil {
-			t.Fatalf("expected error when AgentTimeoutSec >= AnalyzeTimeoutSec")
+		c, err := Load()
+		if err != nil {
+			t.Fatalf("expected AgentTimeoutSec == AnalyzeTimeoutSec to be accepted, got err: %v", err)
+		}
+		if c.AgentTimeoutSec != 60 {
+			t.Fatalf("AgentTimeoutSec=%d, want 60", c.AgentTimeoutSec)
 		}
 	})
 }
