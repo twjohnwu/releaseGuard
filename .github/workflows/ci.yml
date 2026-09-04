@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make build
+      - run: go vet ./...
+      - run: go test ./... -race -count=1
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.13.2
+          args: --timeout=5m
+
+  docker-smoke:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build analyzer image
+        run: docker build -f deploy/Dockerfile.analyzer -t releaseguard-analyzer:ci .
+      - name: Build indexer image
+        run: docker build -f deploy/Dockerfile.indexer -t releaseguard-indexer:ci .
+      - name: Run T1 demo
+        working-directory: deploy/compose
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          dump_logs_and_exit() {
+            local exit_code="$1"
+            trap - ERR
+            if docker compose logs; then
+              echo "RG_COMPOSE_LOGS_DUMPED=1" >> "$GITHUB_ENV" || true
+            fi
+            exit "$exit_code"
+          }
+
+          trap 'exit_code=$?; echo "::error::Run T1 demo failed"; dump_logs_and_exit "$exit_code"' ERR
+
+          mkdir -p artifacts
+          docker compose up -d --build
+
+          containers=(
+            rg-analyzer-proceed
+            rg-analyzer-review
+            rg-analyzer-hold
+          )
+          declare -A container_states
+          deadline=$((SECONDS + 540))
+
+          while true; do
+            if (( SECONDS >= deadline )); then
+              echo "::error::Timed out after 540 seconds waiting for analyzer containers"
+              for container in "${containers[@]}"; do
+                read -r status _ <<< "${container_states[$container]}"
+                if [[ "$status" != "exited" ]]; then
+                  echo "$container: ${container_states[$container]}"
+                fi
+              done
+              dump_logs_and_exit 1
+            fi
+
+            all_exited=true
+            for container in "${containers[@]}"; do
+              state="$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' "$container")"
+              container_states["$container"]="$state"
+              read -r status _ <<< "$state"
+              if [[ "$status" != "exited" ]]; then
+                all_exited=false
+              fi
+            done
+
+            if [[ "$all_exited" == "true" ]]; then
+              break
+            fi
+
+            sleep_duration=5
+            if (( SECONDS + sleep_duration > deadline )); then
+              sleep_duration=$((deadline - SECONDS))
+            fi
+            sleep "$sleep_duration"
+          done
+
+          containers_failed=false
+          for container in "${containers[@]}"; do
+            read -r status exit_code <<< "${container_states[$container]}"
+            if [[ "$exit_code" != "0" ]]; then
+              echo "::error::$container exited non-zero: $status $exit_code"
+              containers_failed=true
+            fi
+          done
+          if [[ "$containers_failed" == "true" ]]; then
+            dump_logs_and_exit 1
+          fi
+
+          trap - ERR
+      - name: docker compose logs
+        if: always()
+        working-directory: deploy/compose
+        shell: bash
+        run: |
+          if [[ "${RG_COMPOSE_LOGS_DUMPED:-0}" != "1" ]]; then
+            docker compose logs
+          fi
+      - name: Assert HOLD/REVIEW/PROCEED verdicts present
+        if: always()
+        working-directory: deploy/compose
+        shell: bash
+        run: |
+          hold='## 🔴 ReleaseGuard recommendation: HOLD'
+          review='## 🟡 ReleaseGuard recommendation: REVIEW'
+          proceed='## ✅ ReleaseGuard recommendation: PROCEED'
+
+          if ! hold_line="$(grep -F -m 1 -- "$hold" artifacts/notes.log)"; then
+            echo "::error::HOLD verdict missing from artifacts/notes.log"
+            exit 1
+          fi
+          if ! review_line="$(grep -F -m 1 -- "$review" artifacts/notes.log)"; then
+            echo "::error::REVIEW verdict missing from artifacts/notes.log"
+            exit 1
+          fi
+          if ! proceed_line="$(grep -F -m 1 -- "$proceed" artifacts/notes.log)"; then
+            echo "::error::PROCEED verdict missing from artifacts/notes.log"
+            exit 1
+          fi
+
+          printf '%s\n' "$hold_line" "$review_line" "$proceed_line"
+      - name: Upload demo artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t1-demo-artifacts
+          path: deploy/compose/artifacts
+          if-no-files-found: ignore
+      - name: docker compose down
+        if: always()
+        working-directory: deploy/compose
+        run: docker compose down -v
