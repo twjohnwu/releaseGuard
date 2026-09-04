@@ -143,12 +143,14 @@ go run ./cmd/analyzer replay --dataset testdata/replay --json
 
 The seed dataset under `testdata/replay/` is copied from the mock-gitlab fixtures and is **not real MR data**; real anonymized MRs are a follow-up.
 
+Case `04-t0demo` needs Postgres for its intended L3 result; with deterministic agents only it yields `PROCEED`, so its `expected.json` records that **observed baseline**, not ground truth.
+
 ## Documentation
 
 - [`docs/case_study.md`](docs/case_study.md) — three MR-comment outcomes side by side, with analysis.
 - [`docs/architecture.md`](docs/architecture.md) — pipeline / topology / decision-matrix mermaid diagrams.
 - [`docs/learnings.md`](docs/learnings.md) — design reflections ("what I learned from making these decisions").
-- [`docs/decisions_log.md`](docs/decisions_log.md) — seventeen design pivots in "initial idea → why wrong → current → lesson" form.
+- [`docs/decisions_log.md`](docs/decisions_log.md) — twenty design pivots in "initial idea → why wrong → current → lesson" form.
 - [`docs/one_pager.md`](docs/one_pager.md) — single-page summary for sharing.
 - [`docs/spec/`](docs/spec/) — full spec (ten design docs plus four implementation plans under `superpower/`).
 - [`deploy/compose/README.md`](deploy/compose/README.md) — local-harness instructions.

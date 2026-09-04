@@ -143,12 +143,14 @@ go run ./cmd/analyzer replay --dataset testdata/replay --json
 
 `testdata/replay/` 的 seed dataset 複製自 mock-gitlab fixtures，**不是真實 MR 資料**；真實且匿名化的 MR 將留待後續補上。
 
+`04-t0demo` 原本需要 Postgres 才能得到 L3 結果；只跑 deterministic agents 時結果是 `PROCEED`，因此它的 `expected.json` 記的是**觀察基線**，不是 ground truth。
+
 ## 文件索引
 
 - [`docs/case_study.md`](docs/case_study.md) — 三段 MR comment 實況對比與分析
 - [`docs/architecture.md`](docs/architecture.md) — Pipeline / Topology / 決策矩陣三張 mermaid 圖
 - [`docs/learnings.md`](docs/learnings.md) — 設計反思（從這些決定中我學到什麼）
-- [`docs/decisions_log.md`](docs/decisions_log.md) — 17 個關鍵設計轉折的「初版 → 為何錯 → 現在 → 學到什麼」
+- [`docs/decisions_log.md`](docs/decisions_log.md) — 20 個關鍵設計轉折的「初版 → 為何錯 → 現在 → 學到什麼」
 - [`docs/one_pager.md`](docs/one_pager.md) — 單頁分享版（問題 / 方法 / 成果）
 - [`docs/spec/`](docs/spec/) — 完整 spec（10 份規格 + 4 份實作 plan 在 `superpower/`）
 - [`deploy/compose/README.md`](deploy/compose/README.md) — local harness 的跑法
