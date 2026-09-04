@@ -195,13 +195,27 @@ func runAgentsParallel(ctx context.Context, log *logger.Logger, agentTimeout tim
 			actx, cancel := context.WithTimeout(ctx, agentTimeout)
 			defer cancel()
 
+			// Capture the agent's name exactly once, before anything else can
+			// panic. If a.Name() itself panics, fall back to an index-based
+			// name so the recover/log paths below never call into the agent
+			// again (a second panic there would escape unrecovered and crash
+			// the process).
+			name := fmt.Sprintf("agent[%d]", i)
+			func() {
+				defer func() { recover() }()
+				name = string(a.Name())
+			}()
+
+			var res interfaces.AgentOutput
 			defer func() {
 				if r := recover(); r != nil {
-					out[i] = interfaces.AgentOutput{Agent: a.Name(), Status: interfaces.StatusFailed,
+					res = interfaces.AgentOutput{Agent: interfaces.AgentName(name), Status: interfaces.StatusFailed,
 						SchemaVersion: "1", Summary: fmt.Sprintf("panic: %v", r),
 						DurationMs: int(time.Since(start).Milliseconds())}
-					log.Error("agent panicked", "agent", a.Name(), "err", r)
+					log.Error("agent panicked", "agent", name, "err", r)
 				}
+				log.Info("agent done", "agent", name, "status", res.Status, "duration_ms", res.DurationMs)
+				out[i] = res
 			}()
 
 			o, err := a.Run(actx, in)
@@ -210,15 +224,14 @@ func runAgentsParallel(ctx context.Context, log *logger.Logger, agentTimeout tim
 				if actx.Err() == context.DeadlineExceeded {
 					summary = fmt.Sprintf("timeout after %s", agentTimeout)
 				}
-				out[i] = interfaces.AgentOutput{Agent: a.Name(), Status: interfaces.StatusFailed,
+				res = interfaces.AgentOutput{Agent: interfaces.AgentName(name), Status: interfaces.StatusFailed,
 					SchemaVersion: "1", Summary: summary, DurationMs: int(time.Since(start).Milliseconds())}
 			} else {
 				if o.DurationMs == 0 {
 					o.DurationMs = int(time.Since(start).Milliseconds())
 				}
-				out[i] = o
+				res = o
 			}
-			log.Info("agent done", "agent", a.Name(), "status", out[i].Status, "duration_ms", out[i].DurationMs)
 		}(i, a)
 	}
 	wg.Wait()

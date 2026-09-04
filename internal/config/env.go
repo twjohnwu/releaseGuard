@@ -133,7 +133,7 @@ func Load() (*Config, error) {
 		GitLabAPIBase:              strEnv("GITLAB_API_BASE", "https://gitlab.com/api/v4"),
 		ProjectsDir:                strEnv("PROJECTS_DIR", "/app/projects"),
 		AnalyzeTimeoutSec:          intEnv("ANALYZE_TIMEOUT_SEC", 180),
-		AgentTimeoutSec:            intEnv("RG_AGENT_TIMEOUT_SECONDS", 60),
+		AgentTimeoutSec:            intEnv("AGENT_TIMEOUT_SEC", 60),
 		OwnershipLookbackDays:      intEnv("OWNERSHIP_LOOKBACK_DAYS", 180),
 		SelectiveTestMinConfidence: floatEnv("SELECTIVE_TEST_MIN_CONFIDENCE", 0.85),
 		PromptMaxTokens:            intEnv("PROMPT_MAX_TOKENS", 8000),
@@ -156,7 +156,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GITLAB_TOKEN required")
 	}
 	if c.AgentTimeoutSec <= 0 || c.AgentTimeoutSec >= c.AnalyzeTimeoutSec {
-		return nil, fmt.Errorf("RG_AGENT_TIMEOUT_SECONDS (%d) must be > 0 and < ANALYZE_TIMEOUT_SEC (%d)",
+		return nil, fmt.Errorf("AGENT_TIMEOUT_SEC (%d) must be > 0 and < ANALYZE_TIMEOUT_SEC (%d)",
 			c.AgentTimeoutSec, c.AnalyzeTimeoutSec)
 	}
 	return c, nil

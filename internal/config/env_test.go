@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -152,14 +153,27 @@ func TestLoadConfigAgentTimeoutDefault(t *testing.T) {
 
 func TestLoadConfigAgentTimeoutRejectsGEAnalyzeTimeout(t *testing.T) {
 	withEnv(map[string]string{
-		"AI_PROVIDER_KEY":          "key",
-		"GITLAB_TOKEN":             "tok",
-		"ANALYZE_TIMEOUT_SEC":      "60",
-		"RG_AGENT_TIMEOUT_SECONDS": "60",
+		"AI_PROVIDER_KEY":     "key",
+		"GITLAB_TOKEN":        "tok",
+		"ANALYZE_TIMEOUT_SEC": "60",
+		"AGENT_TIMEOUT_SEC":   "60",
 	}, func() {
 		_, err := Load()
 		if err == nil {
 			t.Fatalf("expected error when AgentTimeoutSec >= AnalyzeTimeoutSec")
+		}
+	})
+}
+
+func TestLoadConfigAgentTimeoutRejectsZero(t *testing.T) {
+	withEnv(map[string]string{
+		"AI_PROVIDER_KEY":   "key",
+		"GITLAB_TOKEN":      "tok",
+		"AGENT_TIMEOUT_SEC": "0",
+	}, func() {
+		_, err := Load()
+		if err == nil || !strings.Contains(err.Error(), "AGENT_TIMEOUT_SEC") {
+			t.Fatalf("expected error mentioning AGENT_TIMEOUT_SEC, got: %v", err)
 		}
 	})
 }

@@ -13,13 +13,19 @@ import (
 // fakeAgent is a minimal interfaces.IAgent for exercising runAgentsParallel's
 // panic isolation and per-agent timeout behavior.
 type fakeAgent struct {
-	name    interfaces.AgentName
-	run     func(ctx context.Context, in interfaces.AgentInput) (interfaces.AgentOutput, error)
-	doPanic bool
-	block   bool
+	name        interfaces.AgentName
+	run         func(ctx context.Context, in interfaces.AgentInput) (interfaces.AgentOutput, error)
+	doPanic     bool
+	block       bool
+	panicOnName bool
 }
 
-func (f fakeAgent) Name() interfaces.AgentName { return f.name }
+func (f fakeAgent) Name() interfaces.AgentName {
+	if f.panicOnName {
+		panic("name exploded")
+	}
+	return f.name
+}
 
 func (f fakeAgent) Run(ctx context.Context, in interfaces.AgentInput) (interfaces.AgentOutput, error) {
 	if f.doPanic {
@@ -66,5 +72,38 @@ func TestRunAgentsParallel_SlowAgentTimesOutIndependently(t *testing.T) {
 	}
 	if out[0].Status != interfaces.StatusFailed || !strings.Contains(out[0].Summary, "timeout") {
 		t.Fatalf("timed-out agent slot: %+v", out[0])
+	}
+}
+
+func TestRunAgentsParallel_NamePanicDoesNotCrashProcess(t *testing.T) {
+	// Name() panicking must not crash the process (recover already fired
+	// once for the isolated name-capture); Run() itself still succeeds, so
+	// the agent's own result stands, just tagged with the fallback name.
+	agents := []interfaces.IAgent{
+		fakeAgent{name: interfaces.AgentRolloutRisk, panicOnName: true},
+	}
+	log := logger.New()
+	out := runAgentsParallel(context.Background(), log, time.Second, agents, interfaces.AgentInput{})
+
+	if out[0].Status != interfaces.StatusOK {
+		t.Fatalf("expected Run's own success to stand despite Name() panicking: %+v", out[0])
+	}
+}
+
+func TestRunAgentsParallel_SuccessLogsDuration(t *testing.T) {
+	agents := []interfaces.IAgent{
+		fakeAgent{name: interfaces.AgentRolloutRisk, run: func(ctx context.Context, in interfaces.AgentInput) (interfaces.AgentOutput, error) {
+			time.Sleep(2 * time.Millisecond)
+			return interfaces.AgentOutput{Agent: interfaces.AgentRolloutRisk, Status: interfaces.StatusOK, SchemaVersion: "1"}, nil
+		}},
+	}
+	log := logger.New()
+	out := runAgentsParallel(context.Background(), log, time.Second, agents, interfaces.AgentInput{})
+
+	if out[0].Status != interfaces.StatusOK {
+		t.Fatalf("expected ok status: %+v", out[0])
+	}
+	if out[0].DurationMs <= 0 {
+		t.Fatalf("expected DurationMs > 0: %+v", out[0])
 	}
 }
