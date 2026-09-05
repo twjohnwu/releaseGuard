@@ -186,7 +186,19 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 	}
 
 	summary := importSummary{}
+	manifestPath := filepath.Join(*outDir, ".manifest.json")
 	manifest := make(map[string]replayImportManifestEntry)
+	manifestData, err := os.ReadFile(manifestPath)
+	if err == nil {
+		if err := json.Unmarshal(manifestData, &manifest); err != nil {
+			return summary, fmt.Errorf("unmarshal existing replay manifest: %w", err)
+		}
+		if manifest == nil {
+			manifest = make(map[string]replayImportManifestEntry)
+		}
+	} else if !os.IsNotExist(err) {
+		return summary, fmt.Errorf("read existing replay manifest: %w", err)
+	}
 	manifestRepo := ""
 	if source.Name() == "github" {
 		manifestRepo = owner + "/" + repo
@@ -250,7 +262,7 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 		summary.Imported++
 	}
 
-	if err := writeReplayImportJSON(filepath.Join(*outDir, ".manifest.json"), manifest); err != nil {
+	if err := writeReplayImportJSON(manifestPath, manifest); err != nil {
 		return summary, fmt.Errorf("write replay manifest: %w", err)
 	}
 	fmt.Printf("imported: %d, skipped-unlabeled: %d, failed: %d\n", summary.Imported, summary.SkippedUnlabeled, summary.Failed)

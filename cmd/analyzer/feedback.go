@@ -37,7 +37,8 @@ type precisionReport struct {
 }
 
 // parseDecision extracts the decision token (HOLD/REVIEW/PROCEED) from a set of
-// MR note bodies. Returns "" when no ReleaseGuard comment is present.
+// MR note bodies. GetMRNotes returns notes newest-first, so the first matching
+// ReleaseGuard verdict is the newest one. Returns "" when no comment is present.
 func parseDecision(notes []string) string {
 	for _, body := range notes {
 		idx := strings.Index(body, decisionMarker)

@@ -59,6 +59,12 @@ func TestGetMRNotes(t *testing.T) {
 		if r.URL.Path != "/projects/7/merge_requests/3/notes" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
+		if r.URL.Query().Get("sort") != "desc" {
+			t.Errorf("sort param = %q, want desc", r.URL.Query().Get("sort"))
+		}
+		if r.URL.Query().Get("order_by") != "created_at" {
+			t.Errorf("order_by param = %q, want created_at", r.URL.Query().Get("order_by"))
+		}
 		w.Header().Set("Content-Type", "application/json")
 		if _, err := w.Write([]byte(`[{"body":"## 🔴 ReleaseGuard recommendation: HOLD"},{"body":"unrelated"}]`)); err != nil {
 			t.Errorf("write response: %v", err)

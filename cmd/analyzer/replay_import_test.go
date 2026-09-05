@@ -49,7 +49,13 @@ func newFakeGitLab(t *testing.T, mrs []fakeGitLabMR, notesByIID map[int][]string
 			}
 		case strings.Contains(r.URL.Path, "/merge_requests") && strings.HasSuffix(r.URL.Path, "/notes"):
 			iid := iidFromPath(r.URL.Path, "/notes")
-			if _, err := w.Write(notesJSON(notesByIID[iid])); err != nil {
+			bodies := append([]string(nil), notesByIID[iid]...)
+			if r.URL.Query().Get("sort") != "desc" {
+				for left, right := 0, len(bodies)-1; left < right; left, right = left+1, right-1 {
+					bodies[left], bodies[right] = bodies[right], bodies[left]
+				}
+			}
+			if _, err := w.Write(notesJSON(bodies)); err != nil {
 				t.Errorf("write notes response: %v", err)
 			}
 		case strings.HasSuffix(r.URL.Path, "/merge_requests"):
@@ -192,6 +198,94 @@ func TestReplayImportAllowUnlabeled(t *testing.T) {
 	if exp.Recommendation != "" || !exp.NeedsLabel || exp.Source != "unlabeled" {
 		t.Errorf("expected = %+v, want empty/needs_label=true/unlabeled", exp)
 	}
+}
+
+func TestReplayImportNewestNoteWins(t *testing.T) {
+	const project = 3
+	mrs := []fakeGitLabMR{{IID: 21, Title: "Changed verdict", Labels: nil}}
+	notes := map[int][]string{
+		21: {
+			"## ReleaseGuard recommendation: PROCEED",
+			"## ReleaseGuard recommendation: HOLD",
+		},
+	}
+	srv := newFakeGitLab(t, mrs, notes)
+	out := t.TempDir()
+
+	_, err := runReplayImport([]string{
+		"--source", "gitlab",
+		"--project", fmt.Sprintf("%d", project),
+		"--since", "2020-01-01T00:00:00Z",
+		"--out", out,
+		"--allow-unlabeled",
+	}, envOverride{apiBase: srv.URL, token: "fake"})
+	if err != nil {
+		t.Fatalf("runReplayImport() error = %v", err)
+	}
+
+	expected := readExpectedJSON(t, filepath.Join(out, caseDirName(project, 21), "expected.json"))
+	if expected.Recommendation != "PROCEED" || expected.Source != "gitlab-comment" {
+		t.Errorf("expected = %+v, want PROCEED/gitlab-comment", expected)
+	}
+}
+
+func TestReplayImportMergesManifestAcrossRuns(t *testing.T) {
+	out := t.TempDir()
+	run := func(project int, mrs []fakeGitLabMR, notes map[int][]string) {
+		t.Helper()
+		srv := newFakeGitLab(t, mrs, notes)
+		_, err := runReplayImport([]string{
+			"--source", "gitlab",
+			"--project", fmt.Sprintf("%d", project),
+			"--since", "2020-01-01T00:00:00Z",
+			"--out", out,
+		}, envOverride{apiBase: srv.URL, token: "fake"})
+		if err != nil {
+			t.Fatalf("runReplayImport(project=%d) error = %v", project, err)
+		}
+	}
+	readManifest := func() map[string]replayImportManifestEntry {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(out, ".manifest.json"))
+		if err != nil {
+			t.Fatalf("read .manifest.json: %v", err)
+		}
+		var manifest map[string]replayImportManifestEntry
+		if err := json.Unmarshal(data, &manifest); err != nil {
+			t.Fatalf("unmarshal .manifest.json: %v", err)
+		}
+		return manifest
+	}
+	assertEntries := func(manifest map[string]replayImportManifestEntry) {
+		t.Helper()
+		want := []struct {
+			project int
+			iid     int
+		}{
+			{project: 3, iid: 1},
+			{project: 4, iid: 2},
+		}
+		for _, item := range want {
+			key := caseDirName(item.project, item.iid)
+			entry, ok := manifest[key]
+			if !ok || entry.Project != item.project || entry.IID != item.iid {
+				t.Errorf("manifest[%q] = %+v, ok=%t; want project=%d iid=%d", key, entry, ok, item.project, item.iid)
+			}
+		}
+	}
+
+	run(3,
+		[]fakeGitLabMR{{IID: 1, Title: "First", Labels: nil}},
+		map[int][]string{1: {"## ReleaseGuard recommendation: HOLD"}},
+	)
+	run(4,
+		[]fakeGitLabMR{{IID: 2, Title: "Second", Labels: nil}},
+		map[int][]string{2: {"## ReleaseGuard recommendation: HOLD"}},
+	)
+	assertEntries(readManifest())
+
+	run(4, []fakeGitLabMR{}, nil)
+	assertEntries(readManifest())
 }
 
 func TestReplayImportRejectsUnknownSource(t *testing.T) {

@@ -73,8 +73,12 @@ func (c *Client) ListMergedMRs(projectID int, sinceISO string, perPage, maxPages
 // GET /projects/:id/merge_requests/:iid/notes. Used to recover the decision
 // ReleaseGuard emitted from its own MR comment.
 func (c *Client) GetMRNotes(projectID, mrIID int) ([]string, error) {
+	q := url.Values{}
+	q.Set("per_page", "100")
+	q.Set("sort", "desc")
+	q.Set("order_by", "created_at")
 	body, err := c.do("GET",
-		fmt.Sprintf("/projects/%d/merge_requests/%d/notes?per_page=100", projectID, mrIID), nil)
+		fmt.Sprintf("/projects/%d/merge_requests/%d/notes?%s", projectID, mrIID, q.Encode()), nil)
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,16 @@ func TestParseDecision(t *testing.T) {
 	}
 }
 
+func TestParseDecisionNewestFirst(t *testing.T) {
+	notes := []string{
+		"## ReleaseGuard recommendation: PROCEED (newest)",
+		"## ReleaseGuard recommendation: HOLD (older)",
+	}
+	if got := parseDecision(notes); got != "PROCEED" {
+		t.Errorf("parseDecision() = %q, want PROCEED", got)
+	}
+}
+
 func TestComputePrecision(t *testing.T) {
 	decisions := []mrDecision{
 		{IID: 1, Decision: "HOLD", FalsePositive: false},
