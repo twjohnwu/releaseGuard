@@ -162,7 +162,7 @@ GITHUB_TOKEN=... go run ./cmd/analyzer replay-import --source github --repo owne
 go run ./cmd/analyzer replay --dataset .replay
 ```
 
-How `expected.json` is derived (GitLab): the newest `ReleaseGuard recommendation:` note gives the verdict; if the MR also carries the `releaseguard:false-positive` label and the verdict was HOLD or REVIEW, expected becomes `PROCEED`. MRs with no ReleaseGuard note are skipped unless `--allow-unlabeled`, which writes `needs_label: true`; `replay` excludes such cases from metrics and reports them as `unlabeled` until you fill in the recommendation by hand.
+How `expected.json` is derived (GitLab): the newest `ReleaseGuard recommendation:` note gives the verdict; if the MR also carries the `releaseguard:false-positive` label and the verdict was HOLD or REVIEW, expected becomes `PROCEED`. MRs with no ReleaseGuard note are skipped unless `--allow-unlabeled`, which writes `needs_label: true`; `replay` excludes such cases from metrics and reports them as `unlabeled` until you fill in the recommendation by hand. Re-running `replay-import` into the same `--out` never overwrites an `expected.json` you have hand-labelled (`needs_label: false`); pass `--force` to overwrite anyway.
 
 What is stripped and what is kept: no MR title, author, description, URL or note text is ever written. `diff.json` keeps file paths and patch bodies verbatim — they are the signal the agents read — so the dataset is **identity-stripped, not anonymized code**. Case directories are named by a hash; the only file that maps a hash back to a project/MR is `<out>/.manifest.json`. Both `.replay/` and `.manifest.json` are gitignored; move cases into `testdata/replay/` only if that code may be public.
 

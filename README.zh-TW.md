@@ -162,7 +162,7 @@ GITHUB_TOKEN=... go run ./cmd/analyzer replay-import --source github --repo owne
 go run ./cmd/analyzer replay --dataset .replay
 ```
 
-`expected.json` 的推導（GitLab）：取最新一則 `ReleaseGuard recommendation:` note 當 verdict；若 MR 同時帶 `releaseguard:false-positive` label 且 verdict 是 HOLD 或 REVIEW，expected 改為 `PROCEED`。沒有 ReleaseGuard note 的 MR 預設跳過，加 `--allow-unlabeled` 會寫成 `needs_label: true`；`replay` 不把這類 case 算進 metrics，另列 `unlabeled`，等你手動補上 recommendation。
+`expected.json` 的推導（GitLab）：取最新一則 `ReleaseGuard recommendation:` note 當 verdict；若 MR 同時帶 `releaseguard:false-positive` label 且 verdict 是 HOLD 或 REVIEW，expected 改為 `PROCEED`。沒有 ReleaseGuard note 的 MR 預設跳過，加 `--allow-unlabeled` 會寫成 `needs_label: true`；`replay` 不把這類 case 算進 metrics，另列 `unlabeled`，等你手動補上 recommendation。對同一個 `--out` 重跑 `replay-import` 不會覆寫你已手動標好的 `expected.json`（`needs_label: false`）；要覆寫請加 `--force`。
 
 拿掉什麼、留下什麼：MR 標題、作者、描述、URL、note 內文一律不寫入。`diff.json` 保留檔案路徑與 patch 原文——那正是 agent 讀的訊號——所以這份資料是**去身份，不是匿名化的程式碼**。case 目錄用 hash 命名，唯一能把 hash 對回 project／MR 的是 `<out>/.manifest.json`。`.replay/` 與 `.manifest.json` 都在 .gitignore；只有在程式碼可公開時才把 case 搬進 `testdata/replay/`。
 
