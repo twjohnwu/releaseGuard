@@ -138,6 +138,66 @@ func TestRateLimitErrorMentionsToken(t *testing.T) {
 	}
 }
 
+func TestListMergedPRsSkipsPastAllUnmergedPage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var body []byte
+		switch r.URL.Query().Get("page") {
+		case "1":
+			body = []byte(`[
+				{"number":21,"merged_at":null,"updated_at":"2026-08-25T10:00:00Z"},
+				{"number":22,"merged_at":null,"updated_at":"2026-08-24T10:00:00Z"}
+			]`)
+		case "2":
+			body = []byte(`[
+				{"number":23,"merged_at":"2026-08-20T10:00:00Z","updated_at":"2026-08-20T10:00:00Z"}
+			]`)
+		default:
+			body = []byte(`[]`)
+		}
+		if _, err := w.Write(body); err != nil {
+			t.Errorf("write response: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	client := New(srv.URL, "")
+	prs, err := client.ListMergedPRs("acme", "widgets", "2026-08-01T00:00:00Z", 2, 4)
+	if err != nil {
+		t.Fatalf("ListMergedPRs() error = %v", err)
+	}
+	if len(prs) != 1 || prs[0].Number != 23 {
+		t.Fatalf("ListMergedPRs() = %+v, want PR 23", prs)
+	}
+}
+
+func TestListMergedPRsStopsWhenPageAllOlderThanSince(t *testing.T) {
+	pages := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pages++
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`[
+			{"number":31,"merged_at":"2026-07-01T10:00:00Z","updated_at":"2026-07-01T10:00:00Z"},
+			{"number":32,"merged_at":null,"updated_at":"2026-06-30T10:00:00Z"}
+		]`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	client := New(srv.URL, "")
+	prs, err := client.ListMergedPRs("acme", "widgets", "2026-08-01T00:00:00Z", 2, 4)
+	if err != nil {
+		t.Fatalf("ListMergedPRs() error = %v", err)
+	}
+	if len(prs) != 0 {
+		t.Fatalf("ListMergedPRs() = %+v, want none", prs)
+	}
+	if pages != 1 {
+		t.Fatalf("pages = %d, want exactly 1", pages)
+	}
+}
+
 func TestListMergedPRsRespectsMaxPages(t *testing.T) {
 	pages := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

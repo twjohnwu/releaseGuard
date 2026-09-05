@@ -108,8 +108,9 @@ func (c *Client) ListMergedPRs(owner, repo, sinceISO string, perPage, maxPages i
 			return nil, err
 		}
 		var batch []struct {
-			Number   int     `json:"number"`
-			MergedAt *string `json:"merged_at"`
+			Number    int     `json:"number"`
+			MergedAt  *string `json:"merged_at"`
+			UpdatedAt *string `json:"updated_at"`
 		}
 		if err := json.Unmarshal(body, &batch); err != nil {
 			return nil, fmt.Errorf("unmarshal merged prs: %w", err)
@@ -118,22 +119,38 @@ func (c *Client) ListMergedPRs(owner, repo, sinceISO string, perPage, maxPages i
 			break
 		}
 
-		qualified := 0
+		// The list is sorted by updated_at desc, so once every item on a
+		// page is older than the cutoff, nothing on a later page can
+		// qualify either. Unmerged items on a page never signal "stop" —
+		// a page full of closed-unmerged PRs can still be followed by a
+		// page of qualifying merged PRs (both share the same updated_at
+		// ordering).
+		allOlderThanSince := sinceISO != ""
 		for _, pr := range batch {
-			if pr.MergedAt == nil {
-				continue
+			if pr.MergedAt != nil {
+				mergedAt, err := time.Parse(time.RFC3339, *pr.MergedAt)
+				if err != nil {
+					return nil, fmt.Errorf("parse github PR #%d merged_at: %w", pr.Number, err)
+				}
+				if sinceISO == "" || !mergedAt.Before(cutoff) {
+					all = append(all, MergedPR{Number: pr.Number, MergedAt: *pr.MergedAt})
+				}
 			}
-			mergedAt, err := time.Parse(time.RFC3339, *pr.MergedAt)
-			if err != nil {
-				return nil, fmt.Errorf("parse github PR #%d merged_at: %w", pr.Number, err)
+			if allOlderThanSince {
+				if pr.UpdatedAt == nil {
+					allOlderThanSince = false
+					continue
+				}
+				updatedAt, err := time.Parse(time.RFC3339, *pr.UpdatedAt)
+				if err != nil {
+					return nil, fmt.Errorf("parse github PR #%d updated_at: %w", pr.Number, err)
+				}
+				if !updatedAt.Before(cutoff) {
+					allOlderThanSince = false
+				}
 			}
-			if sinceISO != "" && mergedAt.Before(cutoff) {
-				continue
-			}
-			all = append(all, MergedPR{Number: pr.Number, MergedAt: *pr.MergedAt})
-			qualified++
 		}
-		if qualified == 0 {
+		if allOlderThanSince {
 			break
 		}
 	}
