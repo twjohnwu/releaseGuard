@@ -121,6 +121,54 @@ func TestLoadGitLabMissingToken(t *testing.T) {
 	})
 }
 
+func TestLoadGitHub(t *testing.T) {
+	withEnv(t, map[string]string{
+		"GITHUB_API_BASE": "",
+		"GITHUB_TOKEN":    "tok",
+	}, func() {
+		cfg, err := LoadGitHub()
+		if err != nil {
+			t.Fatalf("LoadGitHub: %v", err)
+		}
+		if cfg.Token != "tok" {
+			t.Errorf("Token = %q, want tok", cfg.Token)
+		}
+		if cfg.APIBase != "https://api.github.com" {
+			t.Errorf("APIBase default = %q", cfg.APIBase)
+		}
+	})
+}
+
+func TestLoadGitHubMissingTokenAllowed(t *testing.T) {
+	withEnv(t, map[string]string{
+		"GITHUB_API_BASE": "",
+		"GITHUB_TOKEN":    "",
+	}, func() {
+		cfg, err := LoadGitHub()
+		if err != nil {
+			t.Fatalf("LoadGitHub: %v", err)
+		}
+		if cfg.Token != "" {
+			t.Errorf("Token = %q, want empty", cfg.Token)
+		}
+	})
+}
+
+func TestLoadGitHubOverrideBase(t *testing.T) {
+	withEnv(t, map[string]string{
+		"GITHUB_API_BASE": "http://x",
+		"GITHUB_TOKEN":    "tok",
+	}, func() {
+		cfg, err := LoadGitHub()
+		if err != nil {
+			t.Fatalf("LoadGitHub: %v", err)
+		}
+		if cfg.APIBase != "http://x" {
+			t.Errorf("APIBase = %q, want http://x", cfg.APIBase)
+		}
+	})
+}
+
 func TestParseServiceTypes(t *testing.T) {
 	cases := []struct {
 		in   string

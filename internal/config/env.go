@@ -150,6 +150,20 @@ func LoadGitLab() (GitLabConfig, error) {
 	}, nil
 }
 
+type GitHubConfig struct {
+	APIBase string
+	Token   string
+}
+
+// LoadGitHub reads GitHub's API base and optional token for analyzer
+// subcommands that talk to GitHub directly.
+func LoadGitHub() (GitHubConfig, error) {
+	return GitHubConfig{
+		APIBase: strEnv("GITHUB_API_BASE", "https://api.github.com"),
+		Token:   os.Getenv("GITHUB_TOKEN"),
+	}, nil
+}
+
 func Load() (*Config, error) {
 	analyzeTimeoutSec := intEnv("ANALYZE_TIMEOUT_SEC", 180)
 	agentTimeoutSec, err := agentTimeoutEnv(analyzeTimeoutSec)

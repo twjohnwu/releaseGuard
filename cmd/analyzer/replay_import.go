@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/twjohnwu/releaseGuard/internal/config"
+	"github.com/twjohnwu/releaseGuard/internal/github"
 	"github.com/twjohnwu/releaseGuard/internal/gitlab"
 	"github.com/twjohnwu/releaseGuard/internal/report"
 )
@@ -43,6 +44,36 @@ type gitLabCaseSource struct {
 	client *gitlab.Client
 }
 
+type gitHubCaseSource struct {
+	owner  string
+	repo   string
+	client *github.Client
+}
+
+func (s gitHubCaseSource) Name() string {
+	return "github"
+}
+
+func (s gitHubCaseSource) ListMergedCases(_ int, since string, perPage, maxPages int) ([]importCase, error) {
+	prs, err := s.client.ListMergedPRs(s.owner, s.repo, since, perPage, maxPages)
+	if err != nil {
+		return nil, err
+	}
+	cases := make([]importCase, 0, len(prs))
+	for _, pr := range prs {
+		cases = append(cases, importCase{IID: pr.Number, Labels: nil})
+	}
+	return cases, nil
+}
+
+func (s gitHubCaseSource) GetDiff(_, iid int) ([]gitlab.DiffFile, error) {
+	return s.client.GetPRFiles(s.owner, s.repo, iid)
+}
+
+func (s gitHubCaseSource) GetNotes(_, _ int) ([]string, error) {
+	return nil, nil
+}
+
 func (s gitLabCaseSource) Name() string {
 	return "gitlab"
 }
@@ -71,12 +102,14 @@ type replayImportManifestEntry struct {
 	Source  string `json:"source"`
 	Project int    `json:"project"`
 	IID     int    `json:"iid"`
+	Repo    string `json:"repo,omitempty"`
 }
 
 func runReplayImport(args []string, override envOverride) (importSummary, error) {
 	fs := flag.NewFlagSet("replay-import", flag.ContinueOnError)
 	sourceName := fs.String("source", "gitlab", "case source")
 	projectID := fs.Int("project", 0, "GitLab project ID")
+	repoFlag := fs.String("repo", "", "GitHub owner/repo (source=github only)")
 	since := fs.String("since", "", "only import MRs updated after this RFC3339 timestamp")
 	perPage := fs.Int("per-page", 20, "MRs per API page")
 	maxPages := fs.Int("max-pages", 5, "maximum API pages to scan")
@@ -85,12 +118,29 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 	if err := fs.Parse(args); err != nil {
 		return importSummary{}, err
 	}
+	if *sourceName == "github" {
+		*allowUnlabeled = true
+	}
 
-	if *sourceName != "gitlab" {
+	if *sourceName != "gitlab" && *sourceName != "github" {
 		return importSummary{}, fmt.Errorf("unsupported replay import source %q", *sourceName)
 	}
-	if *projectID <= 0 {
+	if *sourceName == "gitlab" && *repoFlag != "" {
+		return importSummary{}, fmt.Errorf("--repo is only valid with --source github")
+	}
+	if *sourceName == "github" && *projectID > 0 {
+		return importSummary{}, fmt.Errorf("--project is only valid with --source gitlab")
+	}
+	if *sourceName == "gitlab" && *projectID <= 0 {
 		return importSummary{}, fmt.Errorf("project id required: pass --project <id>")
+	}
+	var owner, repo string
+	if *sourceName == "github" {
+		parts := strings.Split(*repoFlag, "/")
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+			return importSummary{}, fmt.Errorf("--repo required as owner/name for --source github")
+		}
+		owner, repo = parts[0], parts[1]
 	}
 	if strings.TrimSpace(*since) != "" {
 		if _, err := time.Parse(time.RFC3339, *since); err != nil {
@@ -98,17 +148,34 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 		}
 	}
 
-	gitLabConfig := config.GitLabConfig{APIBase: override.apiBase, Token: override.token}
-	if override.apiBase == "" && override.token == "" {
-		var err error
-		gitLabConfig, err = config.LoadGitLab()
-		if err != nil {
-			return importSummary{}, err
+	var source caseSource
+	if *sourceName == "gitlab" {
+		gitLabConfig := config.GitLabConfig{APIBase: override.apiBase, Token: override.token}
+		if override.apiBase == "" && override.token == "" {
+			var err error
+			gitLabConfig, err = config.LoadGitLab()
+			if err != nil {
+				return importSummary{}, err
+			}
 		}
-	}
-
-	var source caseSource = gitLabCaseSource{
-		client: gitlab.NewClient(gitLabConfig.APIBase, gitLabConfig.Token),
+		source = gitLabCaseSource{
+			client: gitlab.NewClient(gitLabConfig.APIBase, gitLabConfig.Token),
+		}
+	} else {
+		gitHubConfig := config.GitHubConfig{APIBase: override.apiBase, Token: override.token}
+		if override.apiBase == "" && override.token == "" {
+			var err error
+			gitHubConfig, err = config.LoadGitHub()
+			if err != nil {
+				return importSummary{}, err
+			}
+		}
+		source = gitHubCaseSource{
+			owner:  owner,
+			repo:   repo,
+			client: github.New(gitHubConfig.APIBase, gitHubConfig.Token),
+		}
+		fmt.Println("source github: --allow-unlabeled implied (GitHub PRs carry no ReleaseGuard decision)")
 	}
 	cases, err := source.ListMergedCases(*projectID, *since, *perPage, *maxPages)
 	if err != nil {
@@ -120,6 +187,10 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 
 	summary := importSummary{}
 	manifest := make(map[string]replayImportManifestEntry)
+	manifestRepo := ""
+	if source.Name() == "github" {
+		manifestRepo = owner + "/" + repo
+	}
 	for _, replayCase := range cases {
 		diff, err := source.GetDiff(*projectID, replayCase.IID)
 		if err != nil {
@@ -143,13 +214,22 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 		expected := replayExpected{Recommendation: decision, Source: "gitlab-comment"}
 		if decision == "" {
 			expected.NeedsLabel = true
-			expected.Source = "unlabeled"
+			if source.Name() == "github" {
+				expected.Source = "github-unlabeled"
+			} else {
+				expected.Source = "unlabeled"
+			}
 		} else if (decision == "HOLD" || decision == "REVIEW") && hasLabel(replayCase.Labels, report.FalsePositiveLabel) {
 			expected.Recommendation = "PROCEED"
 			expected.Source = "gitlab-comment+fp-label"
 		}
 
-		caseName := replayImportCaseName(source.Name(), *projectID, replayCase.IID)
+		var caseName string
+		if source.Name() == "github" {
+			caseName = replayImportGitHubCaseName(owner, repo, replayCase.IID)
+		} else {
+			caseName = replayImportCaseName(source.Name(), *projectID, replayCase.IID)
+		}
 		caseDir := filepath.Join(*outDir, caseName)
 		if err := os.MkdirAll(caseDir, 0755); err != nil {
 			return summary, fmt.Errorf("create replay case directory %q: %w", caseName, err)
@@ -165,6 +245,7 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 			Source:  source.Name(),
 			Project: *projectID,
 			IID:     replayCase.IID,
+			Repo:    manifestRepo,
 		}
 		summary.Imported++
 	}
@@ -178,6 +259,11 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 
 func replayImportCaseName(source string, projectID, iid int) string {
 	sum := sha1.Sum([]byte(fmt.Sprintf("%s:%d:%d", source, projectID, iid)))
+	return hex.EncodeToString(sum[:])[:12]
+}
+
+func replayImportGitHubCaseName(owner, repo string, number int) string {
+	sum := sha1.Sum([]byte(fmt.Sprintf("github:%s/%s:%d", owner, repo, number)))
 	return hex.EncodeToString(sum[:])[:12]
 }
 
