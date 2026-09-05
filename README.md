@@ -78,6 +78,8 @@ make build
 ./bin/analyzer
 ```
 
+Prebuilt images: `docker pull ghcr.io/twjohnwu/releaseguard-analyzer:0.1.0` (and `releaseguard-indexer`), published on every `v*` tag.
+
 ## Local end-to-end demo
 
 ```bash

@@ -1,7 +1,7 @@
 # deploy/ci/releaseguard.yaml
 .releaseguard-base:
-  # No publish job exists yet: build and push this image yourself
-  # (make docker && docker push ...) or replace the name with your registry.
+  # Published by .github/workflows/release.yml on every v* tag (analyzer + indexer).
+  # First publish: set the GHCR package visibility to public in GitHub → Packages.
   image: ghcr.io/twjohnwu/releaseguard-analyzer:latest
   variables:
     AI_PROVIDER: "anthropic"

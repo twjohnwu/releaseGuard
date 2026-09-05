@@ -78,6 +78,8 @@ make build
 ./bin/analyzer
 ```
 
+預建 image：`docker pull ghcr.io/twjohnwu/releaseguard-analyzer:0.1.0`（另有 `releaseguard-indexer`），每個 `v*` tag 都會發佈。
+
 ## Local end-to-end demo
 
 ```bash
