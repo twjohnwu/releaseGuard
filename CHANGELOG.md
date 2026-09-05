@@ -7,6 +7,9 @@ Added:
 - `analyzer replay --dataset <dir>`: precision / false-positive measurement over recorded MR diffs; seed dataset `testdata/replay/` from the mock-gitlab fixtures
 - Per-agent timeout `AGENT_TIMEOUT_SEC` (defaults to `ANALYZE_TIMEOUT_SEC`), per-goroutine panic recovery, one `agent done` log line per agent
 - README badges (CI, release, Go) and replay docs
+- `analyzer replay-import --source gitlab|github`: import merged MRs/PRs as identity-stripped replay cases; GitLab expected verdicts come from ReleaseGuard's own comment + `releaseguard:false-positive` label; `replay` reports `unlabeled` cases separately
+- `release.yml`: publish `ghcr.io/twjohnwu/releaseguard-{analyzer,indexer}` on every `v*` tag
+- CI gofmt gate
 
 Changed:
 - Module path `github.com/acme/releaseguard` → `github.com/twjohnwu/releaseGuard`

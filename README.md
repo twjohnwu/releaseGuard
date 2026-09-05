@@ -145,9 +145,26 @@ Output tallies HOLD count, false-positive-labeled HOLDs, and HOLD precision %. T
 go run ./cmd/analyzer replay --dataset testdata/replay --json
 ```
 
-The seed dataset under `testdata/replay/` is copied from the mock-gitlab fixtures and is **not real MR data**; real anonymized MRs are a follow-up.
+The seed dataset under `testdata/replay/` is copied from the mock-gitlab fixtures and is **not real MR data**. Import real merged MRs with `replay-import` (below).
 
 Case `04-t0demo` needs Postgres for its intended L3 result; with deterministic agents only it yields `PROCEED`, so its `expected.json` records that **observed baseline**, not ground truth.
+
+### Importing real MRs
+
+```bash
+# GitLab: expected verdict is derived from ReleaseGuard's own MR comment
+GITLAB_API_BASE=https://gitlab.example.com/api/v4 GITLAB_TOKEN=... \
+  go run ./cmd/analyzer replay-import --source gitlab --project 42 --since 2026-01-01T00:00:00Z --out .replay
+
+# GitHub: PRs carry no ReleaseGuard comment, so every case is written as needs_label=true
+GITHUB_TOKEN=... go run ./cmd/analyzer replay-import --source github --repo owner/name --since 2026-01-01T00:00:00Z --out .replay
+
+go run ./cmd/analyzer replay --dataset .replay
+```
+
+How `expected.json` is derived (GitLab): the newest `ReleaseGuard recommendation:` note gives the verdict; if the MR also carries the `releaseguard:false-positive` label and the verdict was HOLD or REVIEW, expected becomes `PROCEED`. MRs with no ReleaseGuard note are skipped unless `--allow-unlabeled`, which writes `needs_label: true`; `replay` excludes such cases from metrics and reports them as `unlabeled` until you fill in the recommendation by hand.
+
+What is stripped and what is kept: no MR title, author, description, URL or note text is ever written. `diff.json` keeps file paths and patch bodies verbatim — they are the signal the agents read — so the dataset is **identity-stripped, not anonymized code**. Case directories are named by a hash; the only file that maps a hash back to a project/MR is `<out>/.manifest.json`. Both `.replay/` and `.manifest.json` are gitignored; move cases into `testdata/replay/` only if that code may be public.
 
 ## Documentation
 

@@ -145,9 +145,26 @@ HOLD / REVIEW gate 可能誤判。為了量化這件事，每則 HOLD/REVIEW 的
 go run ./cmd/analyzer replay --dataset testdata/replay --json
 ```
 
-`testdata/replay/` 的 seed dataset 複製自 mock-gitlab fixtures，**不是真實 MR 資料**；真實且匿名化的 MR 將留待後續補上。
+`testdata/replay/` 的 seed dataset 複製自 mock-gitlab fixtures，**不是真實 MR 資料**。真實已合併 MR 請用 `replay-import` 匯入（見下）。
 
 `04-t0demo` 原本需要 Postgres 才能得到 L3 結果；只跑 deterministic agents 時結果是 `PROCEED`，因此它的 `expected.json` 記的是**觀察基線**，不是 ground truth。
+
+### 匯入真實 MR
+
+```bash
+# GitLab：expected 由 ReleaseGuard 自己貼的 MR comment 推得
+GITLAB_API_BASE=https://gitlab.example.com/api/v4 GITLAB_TOKEN=... \
+  go run ./cmd/analyzer replay-import --source gitlab --project 42 --since 2026-01-01T00:00:00Z --out .replay
+
+# GitHub：PR 沒有 ReleaseGuard comment，每個 case 都寫成 needs_label=true
+GITHUB_TOKEN=... go run ./cmd/analyzer replay-import --source github --repo owner/name --since 2026-01-01T00:00:00Z --out .replay
+
+go run ./cmd/analyzer replay --dataset .replay
+```
+
+`expected.json` 的推導（GitLab）：取最新一則 `ReleaseGuard recommendation:` note 當 verdict；若 MR 同時帶 `releaseguard:false-positive` label 且 verdict 是 HOLD 或 REVIEW，expected 改為 `PROCEED`。沒有 ReleaseGuard note 的 MR 預設跳過，加 `--allow-unlabeled` 會寫成 `needs_label: true`；`replay` 不把這類 case 算進 metrics，另列 `unlabeled`，等你手動補上 recommendation。
+
+拿掉什麼、留下什麼：MR 標題、作者、描述、URL、note 內文一律不寫入。`diff.json` 保留檔案路徑與 patch 原文——那正是 agent 讀的訊號——所以這份資料是**去身份，不是匿名化的程式碼**。case 目錄用 hash 命名，唯一能把 hash 對回 project／MR 的是 `<out>/.manifest.json`。`.replay/` 與 `.manifest.json` 都在 .gitignore；只有在程式碼可公開時才把 case 搬進 `testdata/replay/`。
 
 ## 文件索引
 

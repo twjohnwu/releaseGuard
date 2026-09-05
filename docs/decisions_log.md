@@ -277,9 +277,21 @@
 
 ---
 
+## 21. Replay import：expected 從 ReleaseGuard 自己的 comment 推得，匿名化只去身份
+
+**最初想法**：要拿真實 MR 建 replay dataset，直覺是先設計一套人工標註流程——匯出 diff、開表單、請 reviewer 逐筆填「這個 MR 該 HOLD 還是 PROCEED」——並且為了能把資料放進 repo，把路徑與字串都做面罩。
+
+**為什麼錯**：人工標註是以週計的工作，而且 GitLab 上早就有現成的標籤：ReleaseGuard 每次跑都把 verdict 貼在 MR comment 裡，reviewer 覺得誤報時會打 `releaseguard:false-positive` label（#18）。這兩個訊號合起來就是一份免費的標註。面罩路徑則會直接毀掉訊號——Rollout Risk 的 zone 判斷、Selective Test 的 L1 對應都靠路徑，面罩後跑出來的 verdict 不再是原本那個 MR 的 verdict。
+
+**現在做法**：`analyzer replay-import --source gitlab` 拉已合併 MR，expected 取最新一則 ReleaseGuard note 的 verdict，帶 false-positive label 且原 verdict 為 HOLD/REVIEW 時改為 PROCEED；沒有 note 的 MR 預設跳過。`--source github` 只拿 diff，全部寫成 `needs_label`，等人補標，`replay` 把這類 case 排除在 metrics 外並另計 `unlabeled`。匿名化只做去身份：不寫標題、作者、描述、URL、note 內文；路徑與 patch 原文保留；case 用 hash 命名，hash 對照表 `.manifest.json` 與預設輸出目錄 `.replay/` 都不進 repo。GitLab notes 明確以 `sort=desc` 取回，確保「最新一次 run 的 verdict 贏」不是靠 API 預設排序。
+
+**學到什麼**：**系統自己的輸出加上使用者的糾正，就是最便宜的標註資料**——前提是這兩個訊號從第一天就設計成機器可讀（#18 的 marker 字串與 label 名稱在這裡直接變成資料來源）。另一個邊界要講清楚：「去身份」和「匿名化程式碼」是兩件事，前者能自動做、後者會毀掉訊號；文件與 commit message 都應該用前者的字眼，不要讓讀者以為資料可以隨手公開。
+
+---
+
 ## 跨決策的觀察
 
-回頭看這 20 個決策，可以歸納出幾個**反覆出現的設計判斷模式**：
+回頭看這 21 個決策，可以歸納出幾個**反覆出現的設計判斷模式**：
 
 ### 模式 A：collapse 在正確的層級
 - Decision #5（recommendation 層 collapse）

@@ -14,7 +14,7 @@ ReleaseGuard is an MR-level release-gating system. Four specialised agents (Sele
 
 | File | When to read it |
 |---|---|
-| `docs/decisions_log.md` | **Before changing any decided behaviour.** Twenty design pivots in "initial → why wrong → current → lesson" form. Many tempting refactors are already discussed and intentional. |
+| `docs/decisions_log.md` | **Before changing any decided behaviour.** Twenty-one design pivots in "initial → why wrong → current → lesson" form. Many tempting refactors are already discussed and intentional. |
 | `docs/architecture.md` | 30-second orientation: three mermaid diagrams (pipeline / topology / decision matrix). |
 | `docs/learnings.md` | Design reflections — the "why behind the why". |
 | `docs/case_study.md` | Three real MR-comment outcomes + Topology 0 integration validation. |
@@ -107,7 +107,7 @@ mock-gitlab routes fixtures by `project_id`: `1=proceed`, `2=review`, `3=hold`, 
 - `docs/decisions_log.md` is the **design history** (narrative, "why we landed here").
 - The **code is the source of truth.** When they disagree, trust the code and update the docs.
 
-If you make a non-trivial design pivot, append a new entry to `decisions_log.md` (continue numbering past #20).
+If you make a non-trivial design pivot, append a new entry to `decisions_log.md` (continue numbering past #21).
 
 ## Doc language convention
 
