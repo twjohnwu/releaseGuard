@@ -74,7 +74,7 @@ type DiffFile struct {
 }
 
 type AgentConfig struct {
-	Topology   string            // "0" or "1"
+	Topology   string // "0" or "1"
 	ProjectDir string
 	Extra      map[string]string // agent-specific
 }

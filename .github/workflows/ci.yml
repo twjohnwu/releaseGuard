@@ -23,6 +23,8 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: make build
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { echo "unformatted files:"; gofmt -l .; exit 1; }
       - run: go vet ./...
       - run: go test ./... -race -count=1
       - run: go run ./cmd/analyzer replay --dataset testdata/replay --json

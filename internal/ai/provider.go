@@ -12,7 +12,7 @@ type ToolSpec struct {
 }
 
 type Message struct {
-	Role    string `json:"role"`    // "user" | "system"
+	Role    string `json:"role"` // "user" | "system"
 	Content string `json:"content"`
 }
 
