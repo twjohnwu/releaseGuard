@@ -1,3 +1,8 @@
+## [Unreleased]
+
+Fixed:
+- `releaseguard-report.json` was written 0600 (from `os.CreateTemp`), so CI could not upload the demo artifacts written by the root container; report files are now 0644 and the docker-smoke job chowns the artifacts dir before upload
+
 ## [0.1.0] - 2026-09-04
 
 First tagged release. Closes the productize round driven by an external review.

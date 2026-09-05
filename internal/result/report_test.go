@@ -52,6 +52,23 @@ func TestWriteReportWritesExpectedFields(t *testing.T) {
 	}
 }
 
+func TestWriteReportSetsReadablePermissions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "releaseguard-report.json")
+
+	if err := WriteReport(path, report.Recommendation{}, nil); err != nil {
+		t.Fatalf("WriteReport: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat report: %v", err)
+	}
+	if info.Mode().Perm() != 0o644 {
+		t.Errorf("mode=%#o", info.Mode().Perm())
+	}
+}
+
 func TestWriteReportEmptyPathDisables(t *testing.T) {
 	if err := WriteReport("", report.Recommendation{}, nil); err != nil {
 		t.Fatalf("empty path should be a no-op, got: %v", err)

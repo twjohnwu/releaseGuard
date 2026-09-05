@@ -65,6 +65,10 @@ func WriteReport(path string, rec report.Recommendation, outs []interfaces.Agent
 		removeErr := os.Remove(tmpName)
 		return fmt.Errorf("close temp report: %w", errors.Join(err, removeErr))
 	}
+	if err := os.Chmod(tmpName, 0o644); err != nil {
+		removeErr := os.Remove(tmpName)
+		return fmt.Errorf("chmod temp report: %w", errors.Join(err, removeErr))
+	}
 	if err := os.Rename(tmpName, path); err != nil {
 		removeErr := os.Remove(tmpName)
 		return fmt.Errorf("rename report: %w", errors.Join(err, removeErr))

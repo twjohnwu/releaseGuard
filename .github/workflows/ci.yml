@@ -157,6 +157,9 @@ jobs:
           fi
 
           printf '%s\n' "$hold_line" "$review_line" "$proceed_line"
+      - name: Make demo artifacts readable
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" deploy/compose/artifacts || true
       - name: Upload demo artifacts
         if: always()
         uses: actions/upload-artifact@v4
