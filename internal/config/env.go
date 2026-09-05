@@ -128,6 +128,28 @@ func agentTimeoutEnv(analyzeTimeoutSec int) (int, error) {
 	return n, nil
 }
 
+// GitLabConfig is the minimal credential set analyzer subcommands need when
+// they talk to GitLab directly (e.g. replay-import) without pulling in the
+// rest of Config's CI-pipeline variables.
+type GitLabConfig struct {
+	APIBase string
+	Token   string
+}
+
+// LoadGitLab reads only GITLAB_API_BASE and GITLAB_TOKEN, matching Load's
+// GitLabAPIBase default. GITLAB_TOKEN is required; its absence is named in
+// the error.
+func LoadGitLab() (GitLabConfig, error) {
+	token := os.Getenv("GITLAB_TOKEN")
+	if token == "" {
+		return GitLabConfig{}, fmt.Errorf("GITLAB_TOKEN required")
+	}
+	return GitLabConfig{
+		APIBase: strEnv("GITLAB_API_BASE", "https://gitlab.com/api/v4"),
+		Token:   token,
+	}, nil
+}
+
 func Load() (*Config, error) {
 	analyzeTimeoutSec := intEnv("ANALYZE_TIMEOUT_SEC", 180)
 	agentTimeoutSec, err := agentTimeoutEnv(analyzeTimeoutSec)

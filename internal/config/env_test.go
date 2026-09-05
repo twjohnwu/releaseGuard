@@ -84,6 +84,43 @@ func TestLoadConfigMissingRequired(t *testing.T) {
 	})
 }
 
+func TestLoadGitLab(t *testing.T) {
+	withEnv(t, map[string]string{"GITLAB_TOKEN": "tok"}, func() {
+		cfg, err := LoadGitLab()
+		if err != nil {
+			t.Fatalf("LoadGitLab: %v", err)
+		}
+		if cfg.Token != "tok" {
+			t.Errorf("Token = %q, want tok", cfg.Token)
+		}
+		if cfg.APIBase != "https://gitlab.com/api/v4" {
+			t.Errorf("APIBase default = %q", cfg.APIBase)
+		}
+	})
+}
+
+func TestLoadGitLabOverrideBase(t *testing.T) {
+	withEnv(t, map[string]string{"GITLAB_TOKEN": "tok", "GITLAB_API_BASE": "http://x"}, func() {
+		cfg, err := LoadGitLab()
+		if err != nil {
+			t.Fatalf("LoadGitLab: %v", err)
+		}
+		if cfg.APIBase != "http://x" {
+			t.Errorf("APIBase = %q, want http://x", cfg.APIBase)
+		}
+	})
+}
+
+func TestLoadGitLabMissingToken(t *testing.T) {
+	withEnv(t, map[string]string{"GITLAB_TOKEN": ""}, func() {
+		if _, err := LoadGitLab(); err == nil {
+			t.Fatal("expected error for missing GITLAB_TOKEN")
+		} else if !strings.Contains(err.Error(), "GITLAB_TOKEN") {
+			t.Errorf("error should name GITLAB_TOKEN: %v", err)
+		}
+	})
+}
+
 func TestParseServiceTypes(t *testing.T) {
 	cases := []struct {
 		in   string

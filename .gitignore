@@ -18,3 +18,7 @@ specs/*
 
 # analyzer report artifact (generated per-run, uploaded via CI artifacts)
 releaseguard-report.json
+
+# replay-import output (contains local case dirs + identity manifest)
+.replay/
+.manifest.json

@@ -27,6 +27,7 @@ type replayCaseResult struct {
 
 type replayMetrics struct {
 	Cases            int                `json:"cases"`
+	Unlabeled        int                `json:"unlabeled"`
 	ExactMatch       int                `json:"exact_match"`
 	ExactMatchPct    float64            `json:"exact_match_pct"`
 	HoldPrecisionPct *float64           `json:"hold_precision_pct"`
@@ -36,6 +37,8 @@ type replayMetrics struct {
 
 type replayExpected struct {
 	Recommendation string `json:"recommendation"`
+	NeedsLabel     bool   `json:"needs_label"`
+	Source         string `json:"source"`
 }
 
 func runReplay(args []string) error {
@@ -78,7 +81,6 @@ func runReplayCases(dataset string, agentTimeoutSec int) (replayMetrics, error) 
 	sort.Strings(caseNames)
 
 	metrics := replayMetrics{
-		Cases:   len(caseNames),
 		PerCase: make([]replayCaseResult, 0, len(caseNames)),
 	}
 	predictedHolds := 0
@@ -88,14 +90,20 @@ func runReplayCases(dataset string, agentTimeoutSec int) (replayMetrics, error) 
 
 	for i, caseName := range caseNames {
 		caseDir := filepath.Join(dataset, caseName)
-		diffFiles, err := readReplayDiff(filepath.Join(caseDir, "diff.json"))
-		if err != nil {
-			return replayMetrics{}, fmt.Errorf("case %q: %w", caseName, err)
-		}
 		expected, err := readReplayExpected(filepath.Join(caseDir, "expected.json"))
 		if err != nil {
 			return replayMetrics{}, fmt.Errorf("case %q: %w", caseName, err)
 		}
+		if expected.NeedsLabel {
+			metrics.Unlabeled++
+			continue
+		}
+
+		diffFiles, err := readReplayDiff(filepath.Join(caseDir, "diff.json"))
+		if err != nil {
+			return replayMetrics{}, fmt.Errorf("case %q: %w", caseName, err)
+		}
+		metrics.Cases++
 
 		difFiles := make([]interfaces.DiffFile, 0, len(diffFiles))
 		for _, diff := range diffFiles {
@@ -193,6 +201,7 @@ func printReplayTable(metrics replayMetrics) {
 	for _, result := range metrics.PerCase {
 		fmt.Printf("%-20s  %-8s  %-8s  %t\n", result.Case, result.Expected, result.Actual, result.Match)
 	}
+	fmt.Printf("unlabeled:           %d\n", metrics.Unlabeled)
 	fmt.Printf("exact match:         %d/%d (%.1f%%)\n", metrics.ExactMatch, metrics.Cases, metrics.ExactMatchPct)
 	fmt.Printf("HOLD precision:      %s\n", replayPct(metrics.HoldPrecisionPct))
 	fmt.Printf("false-positive rate: %s\n", replayPct(metrics.FalsePositivePct))
