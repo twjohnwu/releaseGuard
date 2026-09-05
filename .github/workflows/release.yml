@@ -21,6 +21,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - run: make build
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { echo "unformatted files:"; gofmt -l .; exit 1; }
       - run: go vet ./...
@@ -35,7 +36,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # latest is added automatically for non-prerelease tags (flavor latest=auto); rc/beta tags never move it.
+      # metadata-action defaults to flavor latest=auto: non-prerelease semver tags also get :latest; rc/beta tags never move it.
       - uses: docker/metadata-action@v5
         id: meta-analyzer
         with:
