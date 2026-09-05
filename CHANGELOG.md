@@ -10,6 +10,7 @@ Added:
 - `analyzer replay-import --source gitlab|github`: import merged MRs/PRs as identity-stripped replay cases; GitLab expected verdicts come from ReleaseGuard's own comment + `releaseguard:false-positive` label; `replay` reports `unlabeled` cases separately
 - `release.yml`: publish `ghcr.io/twjohnwu/releaseguard-{analyzer,indexer}` on every `v*` tag
 - CI gofmt gate
+- `replay-import --force`; hand-labelled `expected.json` files are preserved on re-import by default
 
 Changed:
 - Module path `github.com/acme/releaseguard` → `github.com/twjohnwu/releaseGuard`
@@ -20,6 +21,7 @@ Fixed:
 - `Arbitrate` returned an empty Recommendation after a recovered panic; now fails closed to REVIEW with an `arbitration_panic` signal (decisions_log #19)
 - A panicking or hung agent could crash or stall the whole analyzer
 - README / AGENTS.md / CHANGELOG referenced git tags that never existed
+- GitLab MR diff fetch was unpaginated (default 20 files), truncating large MRs on the production analysis path and in replay-import; now pages through all changes
 
 ## Plan A status: complete (pre-squash history; no tag)
 

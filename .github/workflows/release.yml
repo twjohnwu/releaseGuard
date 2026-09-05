@@ -21,7 +21,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - run: go test ./... -count=1
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { echo "unformatted files:"; gofmt -l .; exit 1; }
+      - run: go vet ./...
+      - run: go test ./... -race -count=1
+      - run: go run ./cmd/analyzer replay --dataset testdata/replay --json
 
       - uses: docker/setup-buildx-action@v3
 
@@ -31,20 +35,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # latest is added automatically for non-prerelease tags (flavor latest=auto); rc/beta tags never move it.
       - uses: docker/metadata-action@v5
         id: meta-analyzer
         with:
           images: ghcr.io/twjohnwu/releaseguard-analyzer
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest
 
-      - uses: docker/build-push-action@v6
+      - name: Build analyzer
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/Dockerfile.analyzer
           platforms: linux/amd64
-          push: true
+          push: false
+          load: true
           tags: ${{ steps.meta-analyzer.outputs.tags }}
           labels: ${{ steps.meta-analyzer.outputs.labels }}
 
@@ -54,9 +60,30 @@ jobs:
           images: ghcr.io/twjohnwu/releaseguard-indexer
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest
 
-      - uses: docker/build-push-action@v6
+      - name: Build indexer
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.indexer
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ steps.meta-indexer.outputs.tags }}
+          labels: ${{ steps.meta-indexer.outputs.labels }}
+
+      - name: Push analyzer
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.analyzer
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta-analyzer.outputs.tags }}
+          labels: ${{ steps.meta-analyzer.outputs.labels }}
+
+      - name: Push indexer
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/Dockerfile.indexer
