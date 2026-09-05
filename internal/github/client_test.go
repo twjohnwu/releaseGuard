@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -119,6 +120,51 @@ func TestGetPRFilesMapsRenameAndBinary(t *testing.T) {
 	}
 	if files[1].OldPath != "assets/logo.png" || files[1].NewPath != "assets/logo.png" || files[1].Diff != "" {
 		t.Errorf("binary file = %+v", files[1])
+	}
+}
+
+func TestGetPRFilesStopsAfterShortPage(t *testing.T) {
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.URL.Path != "/repos/acme/widgets/pulls/42/files" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("page"); got != "1" {
+			t.Errorf("page = %q, want 1", got)
+		}
+		if got := r.URL.Query().Get("per_page"); got != "100" {
+			t.Errorf("per_page = %q, want 100", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`[
+			{"filename":"one.go","patch":"one","status":"added"},
+			{"filename":"two.go","patch":"two","status":"modified"},
+			{"filename":"three.go","patch":"three","status":"removed"}
+		]`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	files, err := New(srv.URL, "token").GetPRFiles("acme", "widgets", 42)
+	if err != nil {
+		t.Fatalf("GetPRFiles() error = %v", err)
+	}
+	if len(files) != 3 {
+		t.Fatalf("files = %+v, want three mapped files", files)
+	}
+	if files[0].OldPath != "one.go" || files[0].NewPath != "one.go" || files[0].Diff != "one" || !files[0].NewFile {
+		t.Errorf("files[0] = %+v, want added one.go", files[0])
+	}
+	if files[1].OldPath != "two.go" || files[1].NewPath != "two.go" || files[1].Diff != "two" || files[1].NewFile || files[1].DeletedFile || files[1].RenamedFile {
+		t.Errorf("files[1] = %+v, want modified two.go", files[1])
+	}
+	if files[2].OldPath != "three.go" || files[2].NewPath != "three.go" || files[2].Diff != "three" || !files[2].DeletedFile {
+		t.Errorf("files[2] = %+v, want removed three.go", files[2])
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("requests = %d, want exactly 1", got)
 	}
 }
 

@@ -158,10 +158,11 @@ func (c *Client) ListMergedPRs(owner, repo, sinceISO string, perPage, maxPages i
 }
 
 func (c *Client) GetPRFiles(owner, repo string, number int) ([]gitlab.DiffFile, error) {
+	const perPage = 100
 	var all []gitlab.DiffFile
 	for page := 1; ; page++ {
 		q := url.Values{}
-		q.Set("per_page", "100")
+		q.Set("per_page", fmt.Sprintf("%d", perPage))
 		q.Set("page", fmt.Sprintf("%d", page))
 		path := fmt.Sprintf("/repos/%s/%s/pulls/%d/files?%s", url.PathEscape(owner), url.PathEscape(repo), number, q.Encode())
 		body, err := c.do(http.MethodGet, path, nil)
@@ -176,9 +177,6 @@ func (c *Client) GetPRFiles(owner, repo string, number int) ([]gitlab.DiffFile, 
 		}
 		if err := json.Unmarshal(body, &batch); err != nil {
 			return nil, fmt.Errorf("unmarshal pr files: %w", err)
-		}
-		if len(batch) == 0 {
-			break
 		}
 		for _, file := range batch {
 			oldPath := file.Filename
@@ -197,6 +195,9 @@ func (c *Client) GetPRFiles(owner, repo string, number int) ([]gitlab.DiffFile, 
 				RenamedFile: file.Status == "renamed",
 				DeletedFile: file.Status == "removed",
 			})
+		}
+		if len(batch) < perPage {
+			break
 		}
 	}
 	return all, nil

@@ -3,6 +3,7 @@ package gitlab
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 )
 
 type DiffFile struct {
@@ -15,14 +16,25 @@ type DiffFile struct {
 }
 
 func (c *Client) GetMRDiff(projectID, mrIID int) ([]DiffFile, error) {
-	body, err := c.do("GET",
-		fmt.Sprintf("/projects/%d/merge_requests/%d/diffs", projectID, mrIID), nil)
-	if err != nil {
-		return nil, err
+	const perPage = 100
+	var all []DiffFile
+	for page := 1; ; page++ {
+		q := url.Values{}
+		q.Set("per_page", fmt.Sprintf("%d", perPage))
+		q.Set("page", fmt.Sprintf("%d", page))
+		path := fmt.Sprintf("/projects/%d/merge_requests/%d/diffs?%s", projectID, mrIID, q.Encode())
+		body, err := c.do("GET", path, nil)
+		if err != nil {
+			return nil, err
+		}
+		var batch []DiffFile
+		if err := json.Unmarshal(body, &batch); err != nil {
+			return nil, fmt.Errorf("unmarshal: %w", err)
+		}
+		all = append(all, batch...)
+		if len(batch) < perPage {
+			break
+		}
 	}
-	var out []DiffFile
-	if err := json.Unmarshal(body, &out); err != nil {
-		return nil, fmt.Errorf("unmarshal: %w", err)
-	}
-	return out, nil
+	return all, nil
 }

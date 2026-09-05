@@ -26,6 +26,7 @@ type importSummary struct {
 	Imported         int
 	SkippedUnlabeled int
 	Failed           int
+	PreservedLabels  int
 }
 
 type importCase struct {
@@ -115,6 +116,7 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 	maxPages := fs.Int("max-pages", 5, "maximum API pages to scan")
 	outDir := fs.String("out", ".replay", "output replay dataset directory")
 	allowUnlabeled := fs.Bool("allow-unlabeled", false, "import MRs without a ReleaseGuard decision")
+	force := fs.Bool("force", false, "overwrite existing hand-labelled expected.json files")
 	if err := fs.Parse(args); err != nil {
 		return importSummary{}, err
 	}
@@ -206,13 +208,21 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 	for _, replayCase := range cases {
 		diff, err := source.GetDiff(*projectID, replayCase.IID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "replay-import: %s project %d MR !%d diff: %v\n", source.Name(), *projectID, replayCase.IID, err)
+			if source.Name() == "github" {
+				fmt.Fprintf(os.Stderr, "replay-import: %s repo %s PR #%d diff: %v\n", source.Name(), manifestRepo, replayCase.IID, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "replay-import: %s project %d MR !%d diff: %v\n", source.Name(), *projectID, replayCase.IID, err)
+			}
 			summary.Failed++
 			continue
 		}
 		notes, err := source.GetNotes(*projectID, replayCase.IID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "replay-import: %s project %d MR !%d notes: %v\n", source.Name(), *projectID, replayCase.IID, err)
+			if source.Name() == "github" {
+				fmt.Fprintf(os.Stderr, "replay-import: %s repo %s PR #%d notes: %v\n", source.Name(), manifestRepo, replayCase.IID, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "replay-import: %s project %d MR !%d notes: %v\n", source.Name(), *projectID, replayCase.IID, err)
+			}
 			summary.Failed++
 			continue
 		}
@@ -249,7 +259,22 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 		if err := writeReplayImportJSON(filepath.Join(caseDir, "diff.json"), diff); err != nil {
 			return summary, fmt.Errorf("write case %q diff: %w", caseName, err)
 		}
-		if err := writeReplayImportJSON(filepath.Join(caseDir, "expected.json"), expected); err != nil {
+		expectedPath := filepath.Join(caseDir, "expected.json")
+		preserveExpected := false
+		if !*force {
+			existingData, err := os.ReadFile(expectedPath)
+			if err == nil {
+				var existing replayExpected
+				if json.Unmarshal(existingData, &existing) == nil && !existing.NeedsLabel {
+					preserveExpected = true
+				}
+			} else if !os.IsNotExist(err) {
+				return summary, fmt.Errorf("read case %q expected recommendation: %w", caseName, err)
+			}
+		}
+		if preserveExpected {
+			summary.PreservedLabels++
+		} else if err := writeReplayImportJSON(expectedPath, expected); err != nil {
 			return summary, fmt.Errorf("write case %q expected recommendation: %w", caseName, err)
 		}
 
@@ -265,7 +290,7 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 	if err := writeReplayImportJSON(manifestPath, manifest); err != nil {
 		return summary, fmt.Errorf("write replay manifest: %w", err)
 	}
-	fmt.Printf("imported: %d, skipped-unlabeled: %d, failed: %d\n", summary.Imported, summary.SkippedUnlabeled, summary.Failed)
+	fmt.Printf("imported: %d, skipped-unlabeled: %d, failed: %d, preserved-labels: %d\n", summary.Imported, summary.SkippedUnlabeled, summary.Failed, summary.PreservedLabels)
 	return summary, nil
 }
 

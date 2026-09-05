@@ -200,6 +200,69 @@ func TestReplayImportAllowUnlabeled(t *testing.T) {
 	}
 }
 
+func TestReplayImportPreservesHandLabelUnlessForced(t *testing.T) {
+	const project = 3
+	const iid = 30
+	srv := newFakeGitLab(t,
+		[]fakeGitLabMR{{IID: iid, Title: "Risky change", Labels: nil}},
+		map[int][]string{iid: {"## ReleaseGuard recommendation: HOLD"}},
+	)
+	out := t.TempDir()
+	args := []string{
+		"--source", "gitlab",
+		"--project", fmt.Sprintf("%d", project),
+		"--since", "2020-01-01T00:00:00Z",
+		"--out", out,
+	}
+	if _, err := runReplayImport(args, envOverride{apiBase: srv.URL, token: "fake"}); err != nil {
+		t.Fatalf("initial runReplayImport() error = %v", err)
+	}
+
+	expectedPath := filepath.Join(out, caseDirName(project, iid), "expected.json")
+	fresh, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatalf("read fresh expected.json: %v", err)
+	}
+	manual := []byte(`{"recommendation":"HOLD","needs_label":false,"source":"manual"}`)
+	if err := os.WriteFile(expectedPath, manual, 0644); err != nil {
+		t.Fatalf("write manual expected.json: %v", err)
+	}
+
+	summary, err := runReplayImport(args, envOverride{apiBase: srv.URL, token: "fake"})
+	if err != nil {
+		t.Fatalf("preserving runReplayImport() error = %v", err)
+	}
+	if summary.Imported != 1 || summary.PreservedLabels != 1 {
+		t.Errorf("summary = %+v, want Imported=1 PreservedLabels=1", summary)
+	}
+	preserved, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatalf("read preserved expected.json: %v", err)
+	}
+	if string(preserved) != string(manual) {
+		t.Fatalf("expected.json = %q, want byte-identical %q", preserved, manual)
+	}
+
+	forcedSummary, err := runReplayImport(append(args, "--force"), envOverride{apiBase: srv.URL, token: "fake"})
+	if err != nil {
+		t.Fatalf("forced runReplayImport() error = %v", err)
+	}
+	if forcedSummary.PreservedLabels != 0 {
+		t.Errorf("forced PreservedLabels = %d, want 0", forcedSummary.PreservedLabels)
+	}
+	forcedData, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatalf("read forced expected.json: %v", err)
+	}
+	if string(forcedData) != string(fresh) {
+		t.Errorf("forced expected.json = %q, want freshly generated %q", forcedData, fresh)
+	}
+	forced := readExpectedJSON(t, expectedPath)
+	if forced.Recommendation != "HOLD" || forced.NeedsLabel || forced.Source != "gitlab-comment" {
+		t.Errorf("forced expected = %+v, want HOLD/needs_label=false/gitlab-comment", forced)
+	}
+}
+
 func TestReplayImportNewestNoteWins(t *testing.T) {
 	const project = 3
 	mrs := []fakeGitLabMR{{IID: 21, Title: "Changed verdict", Labels: nil}}

@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -112,6 +114,78 @@ func TestReplayImportGitHub(t *testing.T) {
 	}
 	if metrics.Cases != 0 {
 		t.Errorf("Cases = %d, want 0", metrics.Cases)
+	}
+}
+
+func TestReplayImportGitHubDiffErrorUsesRepoAndPRWording(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/repos/owner/name/pulls":
+			if r.URL.Query().Get("page") == "1" {
+				if _, err := w.Write([]byte(`[{"number":31,"merged_at":"2026-08-20T10:00:00Z"}]`)); err != nil {
+					t.Errorf("write response: %v", err)
+				}
+				return
+			}
+			if _, err := w.Write([]byte(`[]`)); err != nil {
+				t.Errorf("write response: %v", err)
+			}
+		case "/repos/owner/name/pulls/31/files":
+			http.Error(w, "files unavailable", http.StatusInternalServerError)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	stderrReader, stderrWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+	originalStderr := os.Stderr
+	os.Stderr = stderrWriter
+	t.Cleanup(func() {
+		os.Stderr = originalStderr
+		if err := stderrReader.Close(); err != nil {
+			t.Logf("close stderr reader: %v", err)
+		}
+		// stderrWriter is already closed on the happy path (below); this is
+		// just a safety net for early t.Fatalf exits, so a "file already
+		// closed" error here is expected, not a failure.
+		if err := stderrWriter.Close(); err != nil {
+			t.Logf("close stderr writer: %v", err)
+		}
+	})
+
+	summary, runErr := runReplayImport([]string{
+		"--source", "github",
+		"--repo", "owner/name",
+		"--since", "2026-08-01T00:00:00Z",
+		"--out", t.TempDir(),
+	}, envOverride{apiBase: srv.URL})
+	os.Stderr = originalStderr
+	if err := stderrWriter.Close(); err != nil {
+		t.Fatalf("close stderr writer: %v", err)
+	}
+	captured, err := io.ReadAll(stderrReader)
+	if err != nil {
+		t.Fatalf("read stderr: %v", err)
+	}
+	if runErr != nil {
+		t.Fatalf("runReplayImport() error = %v", runErr)
+	}
+	if summary.Failed != 1 {
+		t.Fatalf("Failed = %d, want 1", summary.Failed)
+	}
+	line := string(captured)
+	if !strings.Contains(line, "repo owner/name PR #31 diff:") {
+		t.Errorf("stderr = %q, want repo and PR wording", line)
+	}
+	for _, forbidden := range []string{"project 0", "MR !"} {
+		if strings.Contains(line, forbidden) {
+			t.Errorf("stderr = %q, must not contain %q", line, forbidden)
+		}
 	}
 }
 
