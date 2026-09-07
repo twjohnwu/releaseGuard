@@ -135,11 +135,22 @@ HOLD / REVIEW gate 可能誤判。為了量化這件事，每則 HOLD/REVIEW 的
 ./bin/analyzer feedback --project 42 --json
 ```
 
-輸出統計 HOLD 次數、被標為誤報的 HOLD 數、以及 HOLD precision %。這是不需 Postgres 的 MVP——收集到的資料正是 selective-test 信心常數（`internal/agents/testselect/confidence.go`）等待校準的依據。
+Reviewer 也可以在 HOLD/REVIEW 的 MR 上加 **`releaseguard:confirmed`** label，記錄「這個判定是對的」。輸出統計 HOLD 次數、被標為 confirmed／誤報的 HOLD 數，以及下面這幾個 precision 指標。這是不需 Postgres 的 MVP——收集到的資料正是 selective-test 信心常數（`internal/agents/testselect/confidence.go`）等待校準的依據。
+
+### Precision 報告的限制
+
+`analyzer feedback` 一次輸出四個指標，不是一個：
+
+- `confirmed_hold_precision_pct` — 只算被標成 `releaseguard:confirmed` 或 `releaseguard:false-positive` 的 HOLD；其他 HOLD 不計入分母。
+- `weak_signal_hold_precision_pct` — 舊公式：所有沒標記的 HOLD 一律當「對」算。這就是舊版報告裡的 `precision_pct`。
+- `confirmed_label_coverage_pct` — 有明確標記的 HOLD 佔比。
+- `unlabeled_rate_pct` — 沒有任何標記的 HOLD 佔比。
+
+沒標記的 HOLD **不代表**判定是對的——只代表還沒人看過。務必把 confirmed precision 跟 coverage 一起讀：coverage 低、confirmed precision 卻很高，通常是 selection bias（只有 reviewer 覺得順眼的案例被標記），不是可信的估計值。同一個 MR 同時掛 `releaseguard:confirmed` 和 `releaseguard:false-positive` 會被算成 `hold_conflict`，從所有百分比中排除。分母為零時百分比是 `null`（不是 `0`）。
 
 ## Replay 資料集
 
-`analyzer replay --dataset <dir>` 會對 `<dir>/<case>/{diff.json,expected.json}` 內記錄的 MR diff 執行 deterministic selective-test 與 rollout-risk agents（不使用 AI 或 DB），並回報 exact match、HOLD precision 與 false-positive rate。
+`analyzer replay --dataset <dir>` 會對 `<dir>/<case>/{diff.json,expected.json}` 內記錄的 MR diff 執行 deterministic selective-test 與 rollout-risk agents（不使用 AI 或 DB），並回報 exact match、`confirmed_hold_precision_pct`、`weak_signal_hold_precision_pct`、`confirmed_label_coverage_pct`、`unlabeled_rate_pct` 與 `missed_risk_count`。
 
 ```bash
 go run ./cmd/analyzer replay --dataset testdata/replay --json
@@ -149,6 +160,33 @@ go run ./cmd/analyzer replay --dataset testdata/replay --json
 
 `04-t0demo` 原本需要 Postgres 才能得到 L3 結果；只跑 deterministic agents 時結果是 `PROCEED`，因此它的 `expected.json` 記的是**觀察基線**，不是 ground truth。
 
+`expected.json` 可以額外帶一個 `label` 物件，記錄人工判斷，跟 `recommendation` 字串是分開的：
+
+```json
+{
+  "recommendation": "HOLD",
+  "label": {
+    "human_outcome": "correct",
+    "evidence_source": "reviewer_comment",
+    "derivation": "explicit",
+    "confidence": "high",
+    "evidence_ref": "https://gitlab.example.com/g/p/-/merge_requests/42#note_1",
+    "reviewed_by": "jdoe",
+    "reviewed_at": "2026-09-01T00:00:00Z"
+  }
+}
+```
+
+Enum 值（`internal/report/label.go`）：
+- `human_outcome`：`correct`、`overcautious`、`missed_risk`、`unlabeled`
+- `evidence_source`：`reviewer_comment`、`release_decision`、`post_merge_change`、`deployment`、`incident`
+- `derivation`：`explicit`、`inferred`
+- `confidence`：`high`、`medium`、`low`
+
+`derivation: explicit` 代表人類直接說出結論，也是唯一會餵進 `confirmed_hold_precision_pct` 與 `confirmed_label_coverage_pct` 的標記種類。`derivation: inferred` 是 ReleaseGuard 自己推得的（例如從 `releaseguard:false-positive` label 推來），只餵進 `weak_signal_hold_precision_pct`——跟上面 feedback loop 限制段落一樣的 explicit-vs-inferred 分野：inferred 或沒標記，都不能證明判定是對的。`recommendation` 為空字串的 case 一律算 unlabeled，所有指標都跳過它。
+
+`replay-import` 永遠不會寫出 `derivation: explicit`；匯入的標記只會是 `inferred`（來源 MR 帶 false-positive label 時，`human_outcome` 寫成 `overcautious`）或維持 `unlabeled`。要人工標記某個 case，直接編輯 `expected.json`，設 `derivation: explicit` 並補上 `reviewed_by`／`reviewed_at`。對同一個 case 重跑 `replay-import` 會保留已標成 `explicit` 的標記；要覆寫請加 `--force`。
+
 ### 匯入真實 MR
 
 ```bash
@@ -156,13 +194,18 @@ go run ./cmd/analyzer replay --dataset testdata/replay --json
 GITLAB_API_BASE=https://gitlab.example.com/api/v4 GITLAB_TOKEN=... \
   go run ./cmd/analyzer replay-import --source gitlab --project 42 --since 2026-01-01T00:00:00Z --out .replay
 
-# GitHub：PR 沒有 ReleaseGuard comment，每個 case 都寫成 needs_label=true
+# GitHub：PR 沒有 ReleaseGuard comment，每個 case 都寫成 unlabeled（recommendation 留空）
 GITHUB_TOKEN=... go run ./cmd/analyzer replay-import --source github --repo owner/name --since 2026-01-01T00:00:00Z --out .replay
+
+# 用分層隨機抽樣取代全量匯入（第一批建議抽 30-50 筆做人工標記）：
+go run ./cmd/analyzer replay-import --source gitlab --project 42 --sample 40 --seed 1 --out .replay
 
 go run ./cmd/analyzer replay --dataset .replay
 ```
 
-`expected.json` 的推導（GitLab）：取最新一則 `ReleaseGuard recommendation:` note 當 verdict；若 MR 同時帶 `releaseguard:false-positive` label 且 verdict 是 HOLD 或 REVIEW，expected 改為 `PROCEED`。沒有 ReleaseGuard note 的 MR 預設跳過，加 `--allow-unlabeled` 會寫成 `needs_label: true`；`replay` 不把這類 case 算進 metrics，另列 `unlabeled`，等你手動補上 recommendation。對同一個 `--out` 重跑 `replay-import` 不會覆寫你已手動標好的 `expected.json`（`needs_label: false`）；要覆寫請加 `--force`。
+`expected.json` 的推導（GitLab）：取最新一則 `ReleaseGuard recommendation:` note 當 verdict；若 MR 同時帶 `releaseguard:false-positive` label 且 verdict 是 HOLD 或 REVIEW，expected 改為 `PROCEED`。沒有 ReleaseGuard note 的 MR 預設跳過，加 `--allow-unlabeled` 會寫成空的 `recommendation` 加 `"human_outcome": "unlabeled"`；`replay` 不把這類 case 算進 metrics，另列 `unlabeled`，等你手動補上 recommendation。對同一個 `--out` 重跑 `replay-import` 不會覆寫 label 為 `derivation: explicit` 的 `expected.json`；要覆寫請加 `--force`。
+
+`--sample N --seed S`：不匯入全部已合併 MR，改成在 HOLD/REVIEW/PROCEED 三個 verdict 分層中做分層隨機抽樣，共取 `N` 筆（GitHub 匯入沒有 verdict，只有一個分層）。每層取 `ceil(N / 分層數)` 筆；同一個 seed 抽出的樣本是確定性的，重跑會拿到一樣的結果。抽樣大小與 seed 會記在 `.manifest.json` 的 `sample` 欄位下。第一批人工標記建議抽 30-50 筆。 加 `--allow-unlabeled` 時，沒有 ReleaseGuard note 的 MR 會自成第四層，每層變成 ceil(N/4)。
 
 拿掉什麼、留下什麼：MR 標題、作者、描述、URL、note 內文一律不寫入。`diff.json` 保留檔案路徑與 patch 原文——那正是 agent 讀的訊號——所以這份資料是**去身份，不是匿名化的程式碼**。case 目錄用 hash 命名，唯一能把 hash 對回 project／MR 的是 `<out>/.manifest.json`。`.replay/` 與 `.manifest.json` 都在 .gitignore；只有在程式碼可公開時才把 case 搬進 `testdata/replay/`。
 

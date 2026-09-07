@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+Added:
+- `label` object schema in replay `expected.json` (`human_outcome`, `evidence_source`, `derivation`, `confidence`, `evidence_ref`, `reviewed_by`, `reviewed_at`) with `explicit`/`inferred` derivation, per `internal/report/label.go`
+- `releaseguard:confirmed` MR label, letting reviewers confirm a HOLD/REVIEW verdict was correct
+- `replay-import --sample N --seed S`: deterministic stratified random sampling across HOLD/REVIEW/PROCEED
+- New precision metrics on `analyzer replay` and `analyzer feedback`: `confirmed_hold_precision_pct`, `weak_signal_hold_precision_pct`, `confirmed_label_coverage_pct`, `unlabeled_rate_pct`, and (`replay` only) `missed_risk_count`
+
+Changed (breaking):
+- `analyzer feedback --json` no longer emits `precision_pct` (the `-1` sentinel is gone); use the four new metrics instead
+- `analyzer replay --json` no longer emits `hold_precision_pct` / `false_positive_pct`; use the four new metrics instead
+- `replay-import` writes the new `label` object instead of `needs_label`; unlabeled cases carry `"human_outcome":"unlabeled"` and an empty `recommendation`. `needs_label` is still read for old datasets but never written.
+- `replay-import --force` now means "overwrite `expected.json` files whose label has `derivation: explicit`"; non-explicit files are always re-imported.
+- `analyzer replay` now rejects an `expected.json` with unknown keys (e.g. a mistyped `"expected"` instead of `"recommendation"`) instead of silently treating the case as unlabeled.
+
 Fixed:
 - `releaseguard-report.json` was written 0600 (from `os.CreateTemp`), so CI could not upload the demo artifacts written by the root container; report files are now 0644 and the docker-smoke job chowns the artifacts dir before upload
 

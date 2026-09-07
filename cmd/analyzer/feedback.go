@@ -23,17 +23,52 @@ type mrDecision struct {
 	IID           int    `json:"iid"`
 	Title         string `json:"title"`
 	Decision      string `json:"decision"` // HOLD | REVIEW | PROCEED | "" (none found)
+	Confirmed     bool   `json:"confirmed"`
 	FalsePositive bool   `json:"false_positive"`
+	Outcome       string `json:"outcome"` // confirmed | false_positive | conflict | unlabeled
 }
 
-// precisionReport is the MVP output: how many HOLDs fired and how many were
-// flagged as false positives.
+// Outcome values: the per-decision label classification. Only an explicit
+// releaseguard:confirmed or releaseguard:false-positive label counts —
+// everything else is "unlabeled", never silently treated as correct.
+const (
+	outcomeConfirmed     = "confirmed"
+	outcomeFalsePositive = "false_positive"
+	outcomeConflict      = "conflict"
+	outcomeUnlabeled     = "unlabeled"
+)
+
+// classifyOutcome turns the two label flags into one outcome per mrDecision.
+func classifyOutcome(confirmed, falsePositive bool) string {
+	switch {
+	case confirmed && falsePositive:
+		return outcomeConflict
+	case confirmed:
+		return outcomeConfirmed
+	case falsePositive:
+		return outcomeFalsePositive
+	default:
+		return outcomeUnlabeled
+	}
+}
+
+// precisionReport reports HOLD precision two ways: confirmed_hold_precision_pct
+// (explicit labels only — the trustworthy number) and
+// weak_signal_hold_precision_pct (the old formula, which counts unlabeled
+// HOLDs as correct). confirmed_label_coverage_pct says how much of the
+// confirmed number to trust; never show one percentage without the other.
 type precisionReport struct {
-	MergedScanned      int          `json:"merged_scanned"`
-	HoldCount          int          `json:"hold_count"`
-	HoldFalsePositives int          `json:"hold_false_positives"`
-	PrecisionPct       float64      `json:"precision_pct"` // 100 * (hold - fp) / hold; -1 when no HOLDs
-	Decisions          []mrDecision `json:"decisions"`
+	MergedScanned              int          `json:"merged_scanned"`
+	HoldCount                  int          `json:"hold_count"`
+	HoldConfirmed              int          `json:"hold_confirmed"`
+	HoldFalsePositive          int          `json:"hold_false_positive"`
+	HoldUnlabeled              int          `json:"hold_unlabeled"`
+	HoldConflict               int          `json:"hold_conflict"`
+	ConfirmedHoldPrecisionPct  *float64     `json:"confirmed_hold_precision_pct"`
+	WeakSignalHoldPrecisionPct *float64     `json:"weak_signal_hold_precision_pct"`
+	ConfirmedLabelCoveragePct  *float64     `json:"confirmed_label_coverage_pct"`
+	UnlabeledRatePct           *float64     `json:"unlabeled_rate_pct"`
+	Decisions                  []mrDecision `json:"decisions"`
 }
 
 // parseDecision extracts the decision token (HOLD/REVIEW/PROCEED) from a set of
@@ -55,19 +90,44 @@ func parseDecision(notes []string) string {
 	return ""
 }
 
-// computePrecision tallies HOLD decisions vs false-positive labels.
+// computePrecision tallies HOLD decisions by label outcome and derives the
+// confirmed and weak-signal precision percentages alongside label coverage.
 func computePrecision(decisions []mrDecision) precisionReport {
-	rep := precisionReport{MergedScanned: len(decisions), Decisions: decisions, PrecisionPct: -1}
-	for _, d := range decisions {
-		if d.Decision == "HOLD" {
-			rep.HoldCount++
-			if d.FalsePositive {
-				rep.HoldFalsePositives++
-			}
+	rep := precisionReport{MergedScanned: len(decisions)}
+	classified := make([]mrDecision, len(decisions))
+	for i, d := range decisions {
+		d.Outcome = classifyOutcome(d.Confirmed, d.FalsePositive)
+		classified[i] = d
+		if d.Decision != "HOLD" {
+			continue
+		}
+		rep.HoldCount++
+		switch d.Outcome {
+		case outcomeConfirmed:
+			rep.HoldConfirmed++
+		case outcomeFalsePositive:
+			rep.HoldFalsePositive++
+		case outcomeConflict:
+			rep.HoldConflict++
+		case outcomeUnlabeled:
+			rep.HoldUnlabeled++
 		}
 	}
+	rep.Decisions = classified
+
+	if denominator := rep.HoldConfirmed + rep.HoldFalsePositive; denominator > 0 {
+		v := 100 * float64(rep.HoldConfirmed) / float64(denominator)
+		rep.ConfirmedHoldPrecisionPct = &v
+	}
+	if denominator := rep.HoldCount - rep.HoldConflict; denominator > 0 {
+		v := 100 * float64(rep.HoldCount-rep.HoldConflict-rep.HoldFalsePositive) / float64(denominator)
+		rep.WeakSignalHoldPrecisionPct = &v
+	}
 	if rep.HoldCount > 0 {
-		rep.PrecisionPct = 100 * float64(rep.HoldCount-rep.HoldFalsePositives) / float64(rep.HoldCount)
+		coverage := 100 * float64(rep.HoldConfirmed+rep.HoldFalsePositive) / float64(rep.HoldCount)
+		rep.ConfirmedLabelCoveragePct = &coverage
+		unlabeledRate := 100 * float64(rep.HoldUnlabeled) / float64(rep.HoldCount)
+		rep.UnlabeledRatePct = &unlabeledRate
 	}
 	return rep
 }
@@ -120,6 +180,7 @@ func runFeedback(args []string) error {
 			IID:           mr.IID,
 			Title:         mr.Title,
 			Decision:      parseDecision(notes),
+			Confirmed:     hasLabel(mr.Labels, report.ConfirmedLabel),
 			FalsePositive: hasLabel(mr.Labels, report.FalsePositiveLabel),
 		})
 	}
@@ -136,12 +197,14 @@ func runFeedback(args []string) error {
 
 func printPrecisionTable(rep precisionReport) {
 	fmt.Printf("ReleaseGuard feedback — precision report\n")
-	fmt.Printf("  merged MRs scanned:      %d\n", rep.MergedScanned)
-	fmt.Printf("  HOLD decisions:          %d\n", rep.HoldCount)
-	fmt.Printf("  HOLD false-positives:    %d\n", rep.HoldFalsePositives)
-	if rep.PrecisionPct < 0 {
-		fmt.Printf("  HOLD precision:          n/a (no HOLDs)\n")
-	} else {
-		fmt.Printf("  HOLD precision:          %.1f%%\n", rep.PrecisionPct)
-	}
+	fmt.Printf("  merged MRs scanned:          %d\n", rep.MergedScanned)
+	fmt.Printf("  HOLD decisions:              %d\n", rep.HoldCount)
+	fmt.Printf("  HOLD confirmed:              %d\n", rep.HoldConfirmed)
+	fmt.Printf("  HOLD false-positives:        %d\n", rep.HoldFalsePositive)
+	fmt.Printf("  HOLD unlabeled:              %d\n", rep.HoldUnlabeled)
+	fmt.Printf("  HOLD label conflicts:        %d\n", rep.HoldConflict)
+	fmt.Printf("  confirmed HOLD precision:    %s\n", replayPct(rep.ConfirmedHoldPrecisionPct))
+	fmt.Printf("  weak-signal HOLD precision:  %s\n", replayPct(rep.WeakSignalHoldPrecisionPct))
+	fmt.Printf("  confirmed label coverage:    %s\n", replayPct(rep.ConfirmedLabelCoveragePct))
+	fmt.Printf("  unlabeled rate:              %s\n", replayPct(rep.UnlabeledRatePct))
 }

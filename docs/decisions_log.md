@@ -289,9 +289,19 @@
 
 ---
 
+## 22. Precision 只算 explicit 人工標記；coverage 與 precision 一起出
+
+**最初想法**：`feedback` 與 `replay` 的 precision 公式把「沒有 `releaseguard:false-positive` label 的 HOLD」直接當成「判對了」計入分子與分母。
+
+**為什麼錯**：外部 reviewer 指出這個公式把「沒人反對」跟「有人確認」混為一談——沒標記的 HOLD 唯一能確定的事是沒人特地去反駁它，不代表有人驗證過它是對的。這是典型的 selection bias：只有覺得判錯的人才會主動貼 label，覺得判對的人通常不出聲，於是 precision 數字系統性地被灌水，而且灌水幅度隨 coverage 高低變化，單看一個數字看不出灌水多少。
+
+**現在做法**：新增 `releaseguard:confirmed` label 讓 reviewer 也能主動確認判對；precision 拆成兩個指標，`confirmed_hold_precision_pct` 只計入明確標記過的 HOLD（`derivation: explicit`，或匯入時可推得的 `inferred` 誤報），`weak_signal_hold_precision_pct` 保留舊公式當對照組；兩者都必須跟 `confirmed_label_coverage_pct`／`unlabeled_rate_pct` 一起讀，分母為零時輸出 `null` 而非誤導性的 `0`。`replay-import` 匯入的標記一律是 `inferred`，永遠不會自己寫 `explicit`——`explicit` 只能由人手動編輯 `expected.json` 產生，避免匯入流程假造「已確認」的假象。同一個 MR 同時掛 confirmed 和 false-positive 兩個 label 算 `hold_conflict`，直接排除，不強行判定誰贏。
+
+**學到什麼**：**一個 precision 數字沒有 coverage 就沒有意義**。任何「未表態＝算對」的指標，本質上都是拿沉默當同意，而沉默的真正含義往往是「沒空看」而不是「同意」；量測系統只要有辦法讓使用者選擇不表態，就必須把「有多少人表態了」跟「表態的人裡有多少對」分開報，否則數字會隨著 reviewer 的忙碌程度自己漂移，而不是隨著系統真正的準確度漂移。
+
 ## 跨決策的觀察
 
-回頭看這 21 個決策，可以歸納出幾個**反覆出現的設計判斷模式**：
+回頭看這 22 個決策，可以歸納出幾個**反覆出現的設計判斷模式**：
 
 ### 模式 A：collapse 在正確的層級
 - Decision #5（recommendation 層 collapse）

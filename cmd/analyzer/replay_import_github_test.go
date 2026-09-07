@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/twjohnwu/releaseGuard/internal/report"
 )
 
 func newFakeGitHub(t *testing.T, sawAuthorization *atomic.Bool) *httptest.Server {
@@ -88,8 +90,11 @@ func TestReplayImportGitHub(t *testing.T) {
 	}
 
 	expected := readExpectedJSON(t, filepath.Join(caseDir, "expected.json"))
-	if expected.Recommendation != "" || !expected.NeedsLabel || expected.Source != "github-unlabeled" {
-		t.Errorf("expected = %+v, want empty/needs_label=true/github-unlabeled", expected)
+	if expected.Recommendation != "" || expected.NeedsLabel || expected.Source != "github-unlabeled" {
+		t.Errorf("expected = %+v, want empty/needs_label=false/github-unlabeled", expected)
+	}
+	if expected.Label == nil || expected.Label.HumanOutcome != report.HumanOutcomeUnlabeled {
+		t.Errorf("label = %+v, want unlabeled", expected.Label)
 	}
 
 	manifestData, err := os.ReadFile(filepath.Join(out, ".manifest.json"))
@@ -105,12 +110,15 @@ func TestReplayImportGitHub(t *testing.T) {
 		t.Errorf("manifest entry = %+v", entry)
 	}
 
+	// A fresh unlabeled GitHub import carries both needs_label=true and an
+	// empty recommendation; runReplayCases skips it into the Unlabeled
+	// tally on either signal.
 	metrics, err := runReplayCases(out, 60)
 	if err != nil {
 		t.Fatalf("runReplayCases() error = %v", err)
 	}
-	if metrics.Unlabeled != summary.Imported {
-		t.Errorf("Unlabeled = %d, want %d", metrics.Unlabeled, summary.Imported)
+	if metrics.Unlabeled != 1 {
+		t.Errorf("Unlabeled = %d, want 1 (empty recommendation treated as unlabeled)", metrics.Unlabeled)
 	}
 	if metrics.Cases != 0 {
 		t.Errorf("Cases = %d, want 0", metrics.Cases)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -26,19 +27,33 @@ type replayCaseResult struct {
 }
 
 type replayMetrics struct {
-	Cases            int                `json:"cases"`
-	Unlabeled        int                `json:"unlabeled"`
-	ExactMatch       int                `json:"exact_match"`
-	ExactMatchPct    float64            `json:"exact_match_pct"`
-	HoldPrecisionPct *float64           `json:"hold_precision_pct"`
-	FalsePositivePct *float64           `json:"false_positive_pct"`
-	PerCase          []replayCaseResult `json:"per_case"`
+	Cases                      int                `json:"cases"`
+	Unlabeled                  int                `json:"unlabeled"`
+	ExactMatch                 int                `json:"exact_match"`
+	ExactMatchPct              float64            `json:"exact_match_pct"`
+	ConfirmedHoldPrecisionPct  *float64           `json:"confirmed_hold_precision_pct"`
+	WeakSignalHoldPrecisionPct *float64           `json:"weak_signal_hold_precision_pct"`
+	ConfirmedLabelCoveragePct  *float64           `json:"confirmed_label_coverage_pct"`
+	UnlabeledRatePct           *float64           `json:"unlabeled_rate_pct"`
+	MissedRiskCount            int                `json:"missed_risk_count"`
+	PerCase                    []replayCaseResult `json:"per_case"`
 }
 
 type replayExpected struct {
-	Recommendation string `json:"recommendation"`
-	NeedsLabel     bool   `json:"needs_label"`
-	Source         string `json:"source"`
+	Recommendation string        `json:"recommendation"`
+	NeedsLabel     bool          `json:"needs_label,omitempty"`
+	Source         string        `json:"source"`
+	Label          *report.Label `json:"label,omitempty"`
+}
+
+func replayEffectiveOutcome(expected replayExpected) (outcome string, err error) {
+	if expected.Label != nil {
+		if err := expected.Label.Validate(); err != nil {
+			return "", err
+		}
+		return expected.Label.HumanOutcome, nil
+	}
+	return report.HumanOutcomeUnlabeled, nil
 }
 
 func runReplay(args []string) error {
@@ -83,10 +98,15 @@ func runReplayCases(dataset string, agentTimeoutSec int) (replayMetrics, error) 
 	metrics := replayMetrics{
 		PerCase: make([]replayCaseResult, 0, len(caseNames)),
 	}
-	predictedHolds := 0
-	correctHolds := 0
-	expectedProceeds := 0
-	falsePositives := 0
+	type replayRunCase struct {
+		name        string
+		actual      string
+		expectedRec string
+		outcome     string
+		explicit    bool
+		weakSignal  bool
+	}
+	runCases := make([]replayRunCase, 0, len(caseNames))
 
 	for i, caseName := range caseNames {
 		caseDir := filepath.Join(dataset, caseName)
@@ -94,9 +114,13 @@ func runReplayCases(dataset string, agentTimeoutSec int) (replayMetrics, error) 
 		if err != nil {
 			return replayMetrics{}, fmt.Errorf("case %q: %w", caseName, err)
 		}
-		if expected.NeedsLabel {
+		if expected.NeedsLabel || expected.Recommendation == "" {
 			metrics.Unlabeled++
 			continue
+		}
+		outcome, err := replayEffectiveOutcome(expected)
+		if err != nil {
+			return replayMetrics{}, fmt.Errorf("case %q: %w", caseName, err)
 		}
 
 		diffFiles, err := readReplayDiff(filepath.Join(caseDir, "diff.json"))
@@ -139,34 +163,74 @@ func runReplayCases(dataset string, agentTimeoutSec int) (replayMetrics, error) 
 			Match:    actual == expected.Recommendation,
 		}
 		metrics.PerCase = append(metrics.PerCase, result)
+		runCases = append(runCases, replayRunCase{
+			name:        caseName,
+			actual:      actual,
+			expectedRec: expected.Recommendation,
+			outcome:     outcome,
+			explicit:    expected.Label != nil && expected.Label.IsExplicit(),
+			weakSignal:  expected.Label != nil && expected.Label.HumanOutcome != report.HumanOutcomeUnlabeled,
+		})
 
 		if result.Match {
 			metrics.ExactMatch++
-		}
-		if actual == "HOLD" {
-			predictedHolds++
-			if expected.Recommendation == "HOLD" {
-				correctHolds++
-			}
-		}
-		if expected.Recommendation == "PROCEED" {
-			expectedProceeds++
-			if actual == "HOLD" || actual == "REVIEW" {
-				falsePositives++
-			}
 		}
 	}
 
 	if metrics.Cases > 0 {
 		metrics.ExactMatchPct = 100 * float64(metrics.ExactMatch) / float64(metrics.Cases)
 	}
-	if predictedHolds > 0 {
-		v := 100 * float64(correctHolds) / float64(predictedHolds)
-		metrics.HoldPrecisionPct = &v
+
+	allCases := metrics.Cases + metrics.Unlabeled
+	effectivelyUnlabeledRan := 0
+	explicitCount := 0
+	confirmedCorrect := 0
+	confirmedOvercautious := 0
+	weakCorrect := 0
+	weakOvercautious := 0
+	for _, runCase := range runCases {
+		if runCase.outcome == report.HumanOutcomeUnlabeled {
+			effectivelyUnlabeledRan++
+		}
+		if runCase.explicit {
+			explicitCount++
+		}
+		if runCase.outcome == report.HumanOutcomeMissedRisk {
+			metrics.MissedRiskCount++
+		}
+		if runCase.actual != "HOLD" {
+			continue
+		}
+		if runCase.explicit {
+			switch runCase.outcome {
+			case report.HumanOutcomeCorrect:
+				confirmedCorrect++
+			case report.HumanOutcomeOvercautious:
+				confirmedOvercautious++
+			}
+		}
+		if runCase.weakSignal {
+			switch runCase.outcome {
+			case report.HumanOutcomeCorrect:
+				weakCorrect++
+			case report.HumanOutcomeOvercautious:
+				weakOvercautious++
+			}
+		}
 	}
-	if expectedProceeds > 0 {
-		v := 100 * float64(falsePositives) / float64(expectedProceeds)
-		metrics.FalsePositivePct = &v
+	if allCases > 0 {
+		unlabeledRate := 100 * float64(effectivelyUnlabeledRan+metrics.Unlabeled) / float64(allCases)
+		metrics.UnlabeledRatePct = &unlabeledRate
+		confirmedCoverage := 100 * float64(explicitCount) / float64(allCases)
+		metrics.ConfirmedLabelCoveragePct = &confirmedCoverage
+	}
+	if denominator := confirmedCorrect + confirmedOvercautious; denominator > 0 {
+		v := 100 * float64(confirmedCorrect) / float64(denominator)
+		metrics.ConfirmedHoldPrecisionPct = &v
+	}
+	if denominator := weakCorrect + weakOvercautious; denominator > 0 {
+		v := 100 * float64(weakCorrect) / float64(denominator)
+		metrics.WeakSignalHoldPrecisionPct = &v
 	}
 	return metrics, nil
 }
@@ -189,7 +253,9 @@ func readReplayExpected(path string) (replayExpected, error) {
 		return replayExpected{}, fmt.Errorf("read expected recommendation: %w", err)
 	}
 	var expected replayExpected
-	if err := json.Unmarshal(data, &expected); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&expected); err != nil {
 		return replayExpected{}, fmt.Errorf("unmarshal expected recommendation: %w", err)
 	}
 	return expected, nil
@@ -201,10 +267,13 @@ func printReplayTable(metrics replayMetrics) {
 	for _, result := range metrics.PerCase {
 		fmt.Printf("%-20s  %-8s  %-8s  %t\n", result.Case, result.Expected, result.Actual, result.Match)
 	}
-	fmt.Printf("unlabeled:           %d\n", metrics.Unlabeled)
-	fmt.Printf("exact match:         %d/%d (%.1f%%)\n", metrics.ExactMatch, metrics.Cases, metrics.ExactMatchPct)
-	fmt.Printf("HOLD precision:      %s\n", replayPct(metrics.HoldPrecisionPct))
-	fmt.Printf("false-positive rate: %s\n", replayPct(metrics.FalsePositivePct))
+	fmt.Printf("unlabeled:                    %d\n", metrics.Unlabeled)
+	fmt.Printf("exact match:                  %d/%d (%.1f%%)\n", metrics.ExactMatch, metrics.Cases, metrics.ExactMatchPct)
+	fmt.Printf("confirmed HOLD precision:     %s\n", replayPct(metrics.ConfirmedHoldPrecisionPct))
+	fmt.Printf("weak-signal HOLD precision:   %s\n", replayPct(metrics.WeakSignalHoldPrecisionPct))
+	fmt.Printf("confirmed label coverage:     %s\n", replayPct(metrics.ConfirmedLabelCoveragePct))
+	fmt.Printf("unlabeled rate:               %s\n", replayPct(metrics.UnlabeledRatePct))
+	fmt.Printf("missed risk count:            %d\n", metrics.MissedRiskCount)
 }
 
 func replayPct(value *float64) string {

@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/twjohnwu/releaseGuard/internal/report"
 )
 
 func TestRunReplayCases(t *testing.T) {
@@ -17,11 +20,17 @@ func TestRunReplayCases(t *testing.T) {
 	if metrics.Cases != 4 {
 		t.Fatalf("Cases = %d, want 4", metrics.Cases)
 	}
-	if metrics.HoldPrecisionPct == nil {
-		t.Fatal("HoldPrecisionPct is nil, want 100")
+	if metrics.ConfirmedHoldPrecisionPct != nil {
+		t.Errorf("ConfirmedHoldPrecisionPct = %v, want nil", *metrics.ConfirmedHoldPrecisionPct)
 	}
-	if *metrics.HoldPrecisionPct != 100 {
-		t.Fatalf("HoldPrecisionPct = %v, want 100", *metrics.HoldPrecisionPct)
+	if metrics.WeakSignalHoldPrecisionPct != nil {
+		t.Errorf("WeakSignalHoldPrecisionPct = %v, want nil", *metrics.WeakSignalHoldPrecisionPct)
+	}
+	if metrics.ConfirmedLabelCoveragePct == nil || *metrics.ConfirmedLabelCoveragePct != 0 {
+		t.Errorf("ConfirmedLabelCoveragePct = %v, want 0", metrics.ConfirmedLabelCoveragePct)
+	}
+	if metrics.UnlabeledRatePct == nil || *metrics.UnlabeledRatePct != 100 {
+		t.Errorf("UnlabeledRatePct = %v, want 100", metrics.UnlabeledRatePct)
 	}
 
 	byName := make(map[string]replayCaseResult, len(metrics.PerCase))
@@ -43,6 +52,128 @@ func TestRunReplayCases(t *testing.T) {
 	}
 }
 
+func TestReplayExpectedWithoutLabelIsEffectivelyUnlabeled(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "expected.json")
+	if err := os.WriteFile(path, []byte(`{"recommendation":"PROCEED"}`), 0644); err != nil {
+		t.Fatalf("write expected.json: %v", err)
+	}
+	expected, err := readReplayExpected(path)
+	if err != nil {
+		t.Fatalf("readReplayExpected() error = %v", err)
+	}
+	outcome, err := replayEffectiveOutcome(expected)
+	if err != nil {
+		t.Fatalf("replayEffectiveOutcome() error = %v", err)
+	}
+	if outcome != report.HumanOutcomeUnlabeled {
+		t.Errorf("outcome = %q, want %q", outcome, report.HumanOutcomeUnlabeled)
+	}
+}
+
+func TestRunReplayCasesHumanLabelMetrics(t *testing.T) {
+	t.Chdir("../..")
+
+	dir := t.TempDir()
+	tests := []struct {
+		name  string
+		label *report.Label
+	}{
+		{
+			name: "01-explicit-correct",
+			label: &report.Label{
+				HumanOutcome:   report.HumanOutcomeCorrect,
+				EvidenceSource: report.EvidenceSourceReleaseDecision,
+				Derivation:     report.DerivationExplicit,
+				Confidence:     report.ConfidenceHigh,
+			},
+		},
+		{
+			name: "02-inferred-overcautious",
+			label: &report.Label{
+				HumanOutcome:   report.HumanOutcomeOvercautious,
+				EvidenceSource: report.EvidenceSourceReviewerComment,
+				Derivation:     report.DerivationInferred,
+				Confidence:     report.ConfidenceMedium,
+			},
+		},
+		{name: "03-unlabeled"},
+	}
+	for _, tt := range tests {
+		caseDir := filepath.Join(dir, tt.name)
+		if err := os.MkdirAll(caseDir, 0755); err != nil {
+			t.Fatalf("mkdir %s: %v", tt.name, err)
+		}
+		copyFile(t, "testdata/replay/03-hold/diff.json", filepath.Join(caseDir, "diff.json"))
+		expected := replayExpected{Recommendation: "HOLD", Label: tt.label}
+		data, err := json.Marshal(expected)
+		if err != nil {
+			t.Fatalf("marshal expected for %s: %v", tt.name, err)
+		}
+		if err := os.WriteFile(filepath.Join(caseDir, "expected.json"), data, 0644); err != nil {
+			t.Fatalf("write expected for %s: %v", tt.name, err)
+		}
+	}
+
+	metrics, err := runReplayCases(dir, 60)
+	if err != nil {
+		t.Fatalf("runReplayCases() error = %v", err)
+	}
+	if metrics.ConfirmedHoldPrecisionPct == nil || *metrics.ConfirmedHoldPrecisionPct != 100 {
+		t.Errorf("ConfirmedHoldPrecisionPct = %v, want 100", metrics.ConfirmedHoldPrecisionPct)
+	}
+	if metrics.WeakSignalHoldPrecisionPct == nil || *metrics.WeakSignalHoldPrecisionPct != 50 {
+		t.Errorf("WeakSignalHoldPrecisionPct = %v, want 50", metrics.WeakSignalHoldPrecisionPct)
+	}
+}
+
+func TestRunReplayCasesRejectsInvalidLabel(t *testing.T) {
+	dir := t.TempDir()
+	caseName := "invalid-label-case"
+	caseDir := filepath.Join(dir, caseName)
+	if err := os.MkdirAll(caseDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(caseDir, "expected.json"), []byte(`{
+		"recommendation":"HOLD",
+		"label":{"human_outcome":"unknown","evidence_source":"release_decision","derivation":"explicit","confidence":"high"}
+	}`), 0644); err != nil {
+		t.Fatalf("write expected.json: %v", err)
+	}
+
+	_, err := runReplayCases(dir, 60)
+	if err == nil {
+		t.Fatal("runReplayCases() error = nil, want invalid label error")
+	}
+	if !strings.Contains(err.Error(), `case "invalid-label-case"`) {
+		t.Errorf("error = %q, want case directory name", err)
+	}
+}
+
+func TestRunReplayCasesRejectsUnknownTopLevelKey(t *testing.T) {
+	dir := t.TempDir()
+	caseName := "unknown-key-case"
+	caseDir := filepath.Join(dir, caseName)
+	if err := os.MkdirAll(caseDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(caseDir, "expected.json"), []byte(
+		`{"expected":"HOLD","label":{"human_outcome":"correct","evidence_source":"reviewer_comment","derivation":"explicit","confidence":"high"}}`,
+	), 0644); err != nil {
+		t.Fatalf("write expected.json: %v", err)
+	}
+
+	_, err := runReplayCases(dir, 60)
+	if err == nil {
+		t.Fatal("runReplayCases() error = nil, want unknown-field error")
+	}
+	if !strings.Contains(err.Error(), `case "unknown-key-case"`) {
+		t.Errorf("error = %q, want case directory name", err)
+	}
+	if !strings.Contains(err.Error(), "expected") {
+		t.Errorf("error = %q, want offending key %q", err, "expected")
+	}
+}
+
 func TestRunReplayJSON(t *testing.T) {
 	t.Chdir("../..")
 
@@ -59,6 +190,62 @@ func TestRunReplayJSON(t *testing.T) {
 	}
 	if metrics.Cases != 4 {
 		t.Errorf("Cases = %d, want 4", metrics.Cases)
+	}
+}
+
+func TestRunReplayCasesTreatsEmptyRecommendationAsUnlabeled(t *testing.T) {
+	t.Chdir("../..")
+
+	dir := t.TempDir()
+
+	normalDir := filepath.Join(dir, "01-normal")
+	if err := os.MkdirAll(normalDir, 0755); err != nil {
+		t.Fatalf("mkdir 01-normal: %v", err)
+	}
+	copyFile(t, "testdata/replay/03-hold/diff.json", filepath.Join(normalDir, "diff.json"))
+	normalExpected := replayExpected{
+		Recommendation: "HOLD",
+		Label: &report.Label{
+			HumanOutcome:   report.HumanOutcomeCorrect,
+			EvidenceSource: report.EvidenceSourceReleaseDecision,
+			Derivation:     report.DerivationExplicit,
+			Confidence:     report.ConfidenceHigh,
+		},
+	}
+	normalData, err := json.Marshal(normalExpected)
+	if err != nil {
+		t.Fatalf("marshal expected for 01-normal: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(normalDir, "expected.json"), normalData, 0644); err != nil {
+		t.Fatalf("write expected for 01-normal: %v", err)
+	}
+
+	githubDir := filepath.Join(dir, "02-github-unlabeled")
+	if err := os.MkdirAll(githubDir, 0755); err != nil {
+		t.Fatalf("mkdir 02-github-unlabeled: %v", err)
+	}
+	copyFile(t, "testdata/replay/03-hold/diff.json", filepath.Join(githubDir, "diff.json"))
+	if err := os.WriteFile(filepath.Join(githubDir, "expected.json"), []byte(
+		`{"recommendation":"","source":"github:o/r:1","label":{"human_outcome":"unlabeled"}}`,
+	), 0644); err != nil {
+		t.Fatalf("write expected for 02-github-unlabeled: %v", err)
+	}
+
+	metrics, err := runReplayCases(dir, 60)
+	if err != nil {
+		t.Fatalf("runReplayCases() error = %v", err)
+	}
+	if metrics.Cases != 1 {
+		t.Errorf("Cases = %d, want 1", metrics.Cases)
+	}
+	if metrics.Unlabeled != 1 {
+		t.Errorf("Unlabeled = %d, want 1", metrics.Unlabeled)
+	}
+	if metrics.ExactMatch != 1 {
+		t.Errorf("ExactMatch = %d, want 1", metrics.ExactMatch)
+	}
+	if metrics.UnlabeledRatePct == nil || *metrics.UnlabeledRatePct != 50 {
+		t.Errorf("UnlabeledRatePct = %v, want 50", metrics.UnlabeledRatePct)
 	}
 }
 

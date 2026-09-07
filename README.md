@@ -135,11 +135,22 @@ The `feedback` subcommand then scans recent merged MRs, matches ReleaseGuard's o
 ./bin/analyzer feedback --project 42 --json
 ```
 
-Output tallies HOLD count, false-positive-labeled HOLDs, and HOLD precision %. This is a Postgres-free MVP — the collected data is what the selective-test confidence constants (`internal/agents/testselect/confidence.go`) await for calibration.
+Reviewers may also add **`releaseguard:confirmed`** to a HOLD/REVIEW MR to record that the verdict was right. Output tallies HOLD count, confirmed/false-positive-labeled HOLDs, and the precision metrics below. This is a Postgres-free MVP — the collected data is what the selective-test confidence constants (`internal/agents/testselect/confidence.go`) await for calibration.
+
+### Limitations of the precision report
+
+`analyzer feedback` emits four metrics, not one:
+
+- `confirmed_hold_precision_pct` — precision computed only over MRs labelled `releaseguard:confirmed` or `releaseguard:false-positive`; every other HOLD is excluded from the denominator.
+- `weak_signal_hold_precision_pct` — the old formula: every unlabeled HOLD is counted as correct. This is what earlier versions of this report reported as `precision_pct`.
+- `confirmed_label_coverage_pct` — the share of HOLDs that carry an explicit label at all.
+- `unlabeled_rate_pct` — the share of HOLDs with no label.
+
+An unlabeled HOLD is **not** evidence that the verdict was correct — it just means no one has looked yet. Always read confirmed precision together with coverage: a high confirmed precision on low coverage is selection bias (only the reviewer's favorite cases got labelled), not a reliable estimate. An MR carrying both `releaseguard:confirmed` and `releaseguard:false-positive` is counted as `hold_conflict` and excluded from every percentage. Percentages are `null` (not `0`) when their denominator is zero.
 
 ## Replay dataset
 
-`analyzer replay --dataset <dir>` runs the deterministic selective-test and rollout-risk agents (no AI or database) over recorded MR diffs stored as `<dir>/<case>/{diff.json,expected.json}`. It reports exact match, HOLD precision, and the false-positive rate.
+`analyzer replay --dataset <dir>` runs the deterministic selective-test and rollout-risk agents (no AI or database) over recorded MR diffs stored as `<dir>/<case>/{diff.json,expected.json}`. It reports exact match, `confirmed_hold_precision_pct`, `weak_signal_hold_precision_pct`, `confirmed_label_coverage_pct`, `unlabeled_rate_pct`, and `missed_risk_count`.
 
 ```bash
 go run ./cmd/analyzer replay --dataset testdata/replay --json
@@ -149,6 +160,33 @@ The seed dataset under `testdata/replay/` is copied from the mock-gitlab fixture
 
 Case `04-t0demo` needs Postgres for its intended L3 result; with deterministic agents only it yields `PROCEED`, so its `expected.json` records that **observed baseline**, not ground truth.
 
+`expected.json` may carry an optional `label` object recording a human judgment, distinct from the `recommendation` string:
+
+```json
+{
+  "recommendation": "HOLD",
+  "label": {
+    "human_outcome": "correct",
+    "evidence_source": "reviewer_comment",
+    "derivation": "explicit",
+    "confidence": "high",
+    "evidence_ref": "https://gitlab.example.com/g/p/-/merge_requests/42#note_1",
+    "reviewed_by": "jdoe",
+    "reviewed_at": "2026-09-01T00:00:00Z"
+  }
+}
+```
+
+Enum values (`internal/report/label.go`):
+- `human_outcome`: `correct`, `overcautious`, `missed_risk`, `unlabeled`
+- `evidence_source`: `reviewer_comment`, `release_decision`, `post_merge_change`, `deployment`, `incident`
+- `derivation`: `explicit`, `inferred`
+- `confidence`: `high`, `medium`, `low`
+
+`derivation: explicit` means a human stated the outcome directly and is the only kind of label that feeds `confirmed_hold_precision_pct` and `confirmed_label_coverage_pct`. `derivation: inferred` is ReleaseGuard's own reconstruction (for example, from the `releaseguard:false-positive` label) and only feeds `weak_signal_hold_precision_pct` — the same explicit-vs-inferred distinction as the feedback loop's limitation note above: an inferred or missing label is not proof the verdict was right. Cases with an empty `recommendation` are counted as unlabeled and skipped from every metric.
+
+`replay-import` never writes `derivation: explicit`; imported labels are either `inferred` (a false-positive label on the source MR becomes `human_outcome: overcautious`) or left `unlabeled`. To hand-label a case, edit `expected.json` directly and set `derivation: explicit` plus `reviewed_by`/`reviewed_at`. Re-running `replay-import` preserves any label already marked `explicit`; pass `--force` to overwrite it anyway.
+
 ### Importing real MRs
 
 ```bash
@@ -156,13 +194,18 @@ Case `04-t0demo` needs Postgres for its intended L3 result; with deterministic a
 GITLAB_API_BASE=https://gitlab.example.com/api/v4 GITLAB_TOKEN=... \
   go run ./cmd/analyzer replay-import --source gitlab --project 42 --since 2026-01-01T00:00:00Z --out .replay
 
-# GitHub: PRs carry no ReleaseGuard comment, so every case is written as needs_label=true
+# GitHub: PRs carry no ReleaseGuard comment, so every case is written unlabeled (empty recommendation)
 GITHUB_TOKEN=... go run ./cmd/analyzer replay-import --source github --repo owner/name --since 2026-01-01T00:00:00Z --out .replay
+
+# Stratified random sample instead of importing everything (recommend 30-50 cases for a first hand-labelled set):
+go run ./cmd/analyzer replay-import --source gitlab --project 42 --sample 40 --seed 1 --out .replay
 
 go run ./cmd/analyzer replay --dataset .replay
 ```
 
-How `expected.json` is derived (GitLab): the newest `ReleaseGuard recommendation:` note gives the verdict; if the MR also carries the `releaseguard:false-positive` label and the verdict was HOLD or REVIEW, expected becomes `PROCEED`. MRs with no ReleaseGuard note are skipped unless `--allow-unlabeled`, which writes `needs_label: true`; `replay` excludes such cases from metrics and reports them as `unlabeled` until you fill in the recommendation by hand. Re-running `replay-import` into the same `--out` never overwrites an `expected.json` you have hand-labelled (`needs_label: false`); pass `--force` to overwrite anyway.
+How `expected.json` is derived (GitLab): the newest `ReleaseGuard recommendation:` note gives the verdict; if the MR also carries the `releaseguard:false-positive` label and the verdict was HOLD or REVIEW, expected becomes `PROCEED`. MRs with no ReleaseGuard note are skipped unless `--allow-unlabeled`, which writes an empty `recommendation` and `"human_outcome": "unlabeled"`; `replay` excludes such cases from metrics and reports them as `unlabeled` until you fill in the recommendation by hand. Re-running `replay-import` into the same `--out` never overwrites an `expected.json` whose label has `derivation: explicit`; pass `--force` to overwrite anyway.
+
+`--sample N --seed S`: instead of importing every merged MR, take a stratified random sample of `N` cases across the HOLD/REVIEW/PROCEED verdict strata (GitHub imports use a single stratum, since PRs carry no verdict). Each stratum contributes `ceil(N / number of strata)` cases; the selection is deterministic for a given seed, so re-running with the same `--seed` reproduces the same sample. The chosen sample size and seed are recorded under the `sample` key in `.manifest.json`. A first hand-labelled set of 30-50 cases is a reasonable starting point. With `--allow-unlabeled`, MRs without a ReleaseGuard note form a fourth stratum, so each stratum then gets ceil(N/4).
 
 What is stripped and what is kept: no MR title, author, description, URL or note text is ever written. `diff.json` keeps file paths and patch bodies verbatim — they are the signal the agents read — so the dataset is **identity-stripped, not anonymized code**. Case directories are named by a hash; the only file that maps a hash back to a project/MR is `<out>/.manifest.json`. Both `.replay/` and `.manifest.json` are gitignored; move cases into `testdata/replay/` only if that code may be public.
 

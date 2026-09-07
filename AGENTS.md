@@ -14,7 +14,7 @@ ReleaseGuard is an MR-level release-gating system. Four specialised agents (Sele
 
 | File | When to read it |
 |---|---|
-| `docs/decisions_log.md` | **Before changing any decided behaviour.** Twenty-one design pivots in "initial → why wrong → current → lesson" form. Many tempting refactors are already discussed and intentional. |
+| `docs/decisions_log.md` | **Before changing any decided behaviour.** Twenty-two design pivots in "initial → why wrong → current → lesson" form. Many tempting refactors are already discussed and intentional. |
 | `docs/architecture.md` | 30-second orientation: three mermaid diagrams (pipeline / topology / decision matrix). |
 | `docs/learnings.md` | Design reflections — the "why behind the why". |
 | `docs/case_study.md` | Three real MR-comment outcomes + Topology 0 integration validation. |
@@ -79,6 +79,7 @@ mock-gitlab routes fixtures by `project_id`: `1=proceed`, `2=review`, `3=hold`, 
 | `symbols.file` is repo-relative and non-empty | L3 lookup `WHERE file = ANY($)` depends on it |
 | `go test ./... -count=1` is green | Required before every commit |
 | Arbitration panic → REVIEW, never empty verdict | `TestArbitrate_PanicFailsClosedToReview` |
+| `replay-import` never writes `derivation: explicit`; `confirmed_hold_precision_pct` reads explicit labels only | `internal/report/label.go` `IsExplicit`; decisions_log.md #22 |
 
 ## Common task recipes
 

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	mathrand "math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -116,7 +118,9 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 	maxPages := fs.Int("max-pages", 5, "maximum API pages to scan")
 	outDir := fs.String("out", ".replay", "output replay dataset directory")
 	allowUnlabeled := fs.Bool("allow-unlabeled", false, "import MRs without a ReleaseGuard decision")
-	force := fs.Bool("force", false, "overwrite existing hand-labelled expected.json files")
+	force := fs.Bool("force", false, "overwrite explicit hand-labelled expected.json files too")
+	sample := fs.Int("sample", 0, "stratified sample size across HOLD/REVIEW/PROCEED verdicts (0 = import everything)")
+	seed := fs.Int64("seed", 1, "random seed for --sample (deterministic)")
 	if err := fs.Parse(args); err != nil {
 		return importSummary{}, err
 	}
@@ -192,11 +196,19 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 	manifest := make(map[string]replayImportManifestEntry)
 	manifestData, err := os.ReadFile(manifestPath)
 	if err == nil {
-		if err := json.Unmarshal(manifestData, &manifest); err != nil {
+		var rawManifest map[string]json.RawMessage
+		if err := json.Unmarshal(manifestData, &rawManifest); err != nil {
 			return summary, fmt.Errorf("unmarshal existing replay manifest: %w", err)
 		}
-		if manifest == nil {
-			manifest = make(map[string]replayImportManifestEntry)
+		for key, raw := range rawManifest {
+			if key == "sample" {
+				continue
+			}
+			var entry replayImportManifestEntry
+			if err := json.Unmarshal(raw, &entry); err != nil {
+				return summary, fmt.Errorf("unmarshal existing replay manifest: %w", err)
+			}
+			manifest[key] = entry
 		}
 	} else if !os.IsNotExist(err) {
 		return summary, fmt.Errorf("read existing replay manifest: %w", err)
@@ -205,17 +217,13 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 	if source.Name() == "github" {
 		manifestRepo = owner + "/" + repo
 	}
+	type replayImportCandidate struct {
+		replayCase importCase
+		notes      []string
+		decision   string
+	}
+	candidates := make([]replayImportCandidate, 0, len(cases))
 	for _, replayCase := range cases {
-		diff, err := source.GetDiff(*projectID, replayCase.IID)
-		if err != nil {
-			if source.Name() == "github" {
-				fmt.Fprintf(os.Stderr, "replay-import: %s repo %s PR #%d diff: %v\n", source.Name(), manifestRepo, replayCase.IID, err)
-			} else {
-				fmt.Fprintf(os.Stderr, "replay-import: %s project %d MR !%d diff: %v\n", source.Name(), *projectID, replayCase.IID, err)
-			}
-			summary.Failed++
-			continue
-		}
 		notes, err := source.GetNotes(*projectID, replayCase.IID)
 		if err != nil {
 			if source.Name() == "github" {
@@ -226,8 +234,61 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 			summary.Failed++
 			continue
 		}
+		candidates = append(candidates, replayImportCandidate{
+			replayCase: replayCase,
+			notes:      notes,
+			decision:   parseDecision(notes),
+		})
+	}
 
-		decision := parseDecision(notes)
+	selected := candidates
+	strataCounts := make(map[string]int)
+	if *sample > 0 {
+		groups := make(map[string][]int)
+		for i, candidate := range candidates {
+			groups[candidate.decision] = append(groups[candidate.decision], i)
+		}
+		selected = nil
+		if len(groups) > 0 {
+			perStratum := (*sample + len(groups) - 1) / len(groups)
+			keys := make([]string, 0, len(groups))
+			for key := range groups {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			rng := mathrand.New(mathrand.NewSource(*seed))
+			selectedIndices := make([]int, 0, *sample)
+			for _, key := range keys {
+				indices := append([]int(nil), groups[key]...)
+				rng.Shuffle(len(indices), func(i, j int) {
+					indices[i], indices[j] = indices[j], indices[i]
+				})
+				count := min(perStratum, len(indices))
+				selectedIndices = append(selectedIndices, indices[:count]...)
+				strataCounts[key] = count
+			}
+			sort.Ints(selectedIndices)
+			selected = make([]replayImportCandidate, 0, len(selectedIndices))
+			for _, index := range selectedIndices {
+				selected = append(selected, candidates[index])
+			}
+		}
+	}
+
+	for _, item := range selected {
+		replayCase := item.replayCase
+		diff, err := source.GetDiff(*projectID, replayCase.IID)
+		if err != nil {
+			if source.Name() == "github" {
+				fmt.Fprintf(os.Stderr, "replay-import: %s repo %s PR #%d diff: %v\n", source.Name(), manifestRepo, replayCase.IID, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "replay-import: %s project %d MR !%d diff: %v\n", source.Name(), *projectID, replayCase.IID, err)
+			}
+			summary.Failed++
+			continue
+		}
+
+		decision := item.decision
 		if decision == "" && !*allowUnlabeled {
 			summary.SkippedUnlabeled++
 			continue
@@ -235,7 +296,7 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 
 		expected := replayExpected{Recommendation: decision, Source: "gitlab-comment"}
 		if decision == "" {
-			expected.NeedsLabel = true
+			expected.Label = &report.Label{HumanOutcome: report.HumanOutcomeUnlabeled}
 			if source.Name() == "github" {
 				expected.Source = "github-unlabeled"
 			} else {
@@ -244,6 +305,15 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 		} else if (decision == "HOLD" || decision == "REVIEW") && hasLabel(replayCase.Labels, report.FalsePositiveLabel) {
 			expected.Recommendation = "PROCEED"
 			expected.Source = "gitlab-comment+fp-label"
+			expected.Label = &report.Label{
+				HumanOutcome:   report.HumanOutcomeOvercautious,
+				EvidenceSource: report.EvidenceSourceReviewerComment,
+				Derivation:     report.DerivationInferred,
+				Confidence:     report.ConfidenceMedium,
+				EvidenceRef:    "mr-note",
+			}
+		} else {
+			expected.Label = &report.Label{HumanOutcome: report.HumanOutcomeUnlabeled}
 		}
 
 		var caseName string
@@ -265,7 +335,7 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 			existingData, err := os.ReadFile(expectedPath)
 			if err == nil {
 				var existing replayExpected
-				if json.Unmarshal(existingData, &existing) == nil && !existing.NeedsLabel {
+				if json.Unmarshal(existingData, &existing) == nil && existing.Label != nil && existing.Label.Derivation == report.DerivationExplicit {
 					preserveExpected = true
 				}
 			} else if !os.IsNotExist(err) {
@@ -287,7 +357,22 @@ func runReplayImport(args []string, override envOverride) (importSummary, error)
 		summary.Imported++
 	}
 
-	if err := writeReplayImportJSON(manifestPath, manifest); err != nil {
+	out := make(map[string]any, len(manifest)+1)
+	for key, entry := range manifest {
+		out[key] = entry
+	}
+	if *sample > 0 {
+		out["sample"] = struct {
+			N            int            `json:"n"`
+			Seed         int64          `json:"seed"`
+			StrataCounts map[string]int `json:"strata_counts"`
+		}{
+			N:            *sample,
+			Seed:         *seed,
+			StrataCounts: strataCounts,
+		}
+	}
+	if err := writeReplayImportJSON(manifestPath, out); err != nil {
 		return summary, fmt.Errorf("write replay manifest: %w", err)
 	}
 	fmt.Printf("imported: %d, skipped-unlabeled: %d, failed: %d, preserved-labels: %d\n", summary.Imported, summary.SkippedUnlabeled, summary.Failed, summary.PreservedLabels)
